@@ -155,7 +155,8 @@ router.post("/:accountid/createteacher", isPrincipal, async function (req, res) 
         images: encryptimg,
         session:JSON.parse(req.user.configdata).session,
         classid: 0,
-        section: 0
+        section: 0,
+        salary: req.body.salary
     };
     let userRole = '';
     if(req.body.userrole === 3){
@@ -165,25 +166,25 @@ router.post("/:accountid/createteacher", isPrincipal, async function (req, res) 
     }else if(req.body.userrole === 5){
         userRole = 'Accountant'
     }
-    let mailOptions = {
-        from: req.body.emailid,
-        to: req.body.emailid,
-        subject: "Welcome Message",
-        text: 
-        `
-        Name: ${req.body.firstname +" "+ req.body.lastname} 
-        Cell Number: ${req.body.cellnumber} 
-        Username: ${req.body.emailid}
-        Password: ${req.body.adharnumber}
-        You are registered as a ${userRole}. Login with these credentials. If you have any issue then contact your principal.
+    // let mailOptions = {
+    //     from: req.body.emailid,
+    //     to: req.body.emailid,
+    //     subject: "Welcome Message",
+    //     text: 
+    //     `
+    //     Name: ${req.body.firstname +" "+ req.body.lastname} 
+    //     Cell Number: ${req.body.cellnumber} 
+    //     Username: ${req.body.emailid}
+    //     Password: ${req.body.adharnumber}
+    //     You are registered as a ${userRole}. Login with these credentials. If you have any issue then contact your principal.
 
-        Regard:
-        Edusamadhan`
-      };
+    //     Regard:
+    //     Edusamadhan`
+    //   };
     let result = await principalDB.createTeacher(teacherObj, req.user.userid, req.params.accountid);
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: `${userRole} has been created successfully.` });
-        EmailService.transporter.sendMail(mailOptions, function(error, info){});
+        // EmailService.transporter.sendMail(mailOptions, function(error, info){});
     } else {
         res.status(200).json({ status: 0, statusDescription: `${userRole} is not created.` });
     }
@@ -215,7 +216,8 @@ router.put("/:accountid/updateteacher/:teacherid", isPrincipal, checkTeacherBelo
         adharnumber: req.body.adharnumber,
         parmanentaddress: req.body.parmanentaddress,
         localaddress: req.body.localaddress,
-        images:encryptimg
+        images:encryptimg,
+        salary: req.body.salary
     };
 
     let result = await principalDB.updateTeacherDetails(req.params.teacherid, teacherObj);

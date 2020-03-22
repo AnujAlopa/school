@@ -50,7 +50,8 @@ router.get("/getmystudents", isTeacherOrExamHead, async function (req, res) {
                 status: row.status,
                 images:row.images,
                 classid: row.classid,
-                section: row.section
+                section: row.section,
+                busservice: row.busservice
             });
         });
         res.status(200).json({ status: 1, statusDescription: resultObj });
@@ -140,8 +141,11 @@ router.post("/studentRegistration", isTeacherOrExamHead, async function (req, re
         userrole: UserEnum.UserRoles.Student,
         status: UserEnum.UserStatus.Active,
         images: encryptimg,
-        session:JSON.parse(req.user.configdata).session
+        session:JSON.parse(req.user.configdata).session,
+        busservice: req.body.busservice,
+        route: req.body.route
     }
+
     let result = await teacherDB.saveStusentDetails(student, req.user.userid, req.user.accountid);
     if (result) {
         res.status(200).json({ status: 1, statusDescription: 'Student has been created successfully.' });
@@ -179,8 +183,11 @@ router.post("/updateStudent", isTeacherOrExamHead, async function (req, res) {
         localaddress: req.body.localaddress,
         parmanentaddress: req.body.parmanentaddress,
         userid: req.user.userid,
-        images: encryptimg
+        images: encryptimg,
+        busservice: req.body.busservice,
+        route: req.body.route
     }
+
     let result = await teacherDB.updateStusentRecord(studentObj);
     if (result) {
         res.status(200).json({ status: 1, statusDescription: 'Student has been updated successfully.' });
@@ -209,7 +216,9 @@ let result = await teacherDB.getStudentDetails(req.params.studentid, req.user.us
                 locality: row.locality,
                 locaddress: row.localaddress,
                 paraddress: row.parmanentaddress,
-                images: row.images
+                images: row.images,
+                busservice: row.busservice,
+                route: row.route
             });
         });
         res.status(200).json({ status: 1, statusDescription: resultObj });

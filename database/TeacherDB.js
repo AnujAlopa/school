@@ -83,7 +83,7 @@ exports.saveStusentDetails = async function (student, userid, accountid) {
     return db.transaction(async function (conn) {
         let classData = await db.setQuery(conn, 'select classid, section, session from userdetails where userid = ?', userid);
         if (classData[0].classid) {
-            var result = await db.setQuery(conn, 'CALL SQSP_CreatePrescription(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            var result = await db.setQuery(conn, 'CALL SQSP_CreatePrescription(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [student.firstname,
                 student.lastname,
                 student.mothername,
@@ -104,7 +104,9 @@ exports.saveStusentDetails = async function (student, userid, accountid) {
                 classData[0].section,
                 student.session,
                 student.status,
-                student.images
+                student.images,
+                student.busservice,
+                student.route
                 ]);
             let attendanceObj = {
                 accountid: accountid,
@@ -142,7 +144,7 @@ exports.updateStusentRecord = async function (student) {
     return db.transaction(async function (conn) {
         let classData = await db.setQuery(conn, 'select classid, section, session from userdetails where userid = ?', student.userid);
         if (classData[0].classid) {
-            var result = await db.setQuery(conn, 'CALL CSP_UpdateStudentData(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            var result = await db.setQuery(conn, 'CALL CSP_UpdateStudentData(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [student.studentid,
                 student.firstname,
                 student.lastname,
@@ -160,7 +162,9 @@ exports.updateStusentRecord = async function (student) {
                 classData[0].classid,
                 classData[0].section,
                 classData[0].session,
-                student.images
+                student.images,
+                student.busservice,
+                student.route
                 ]);
             return result.affectedRows;
         } else {

@@ -1,6 +1,6 @@
 {
     "local": {
-        "port": 4021,
+        "port": 4022,
         "domain": "localhost:3000",
         "resetpasswordurl": "http://localhost:3000/guest/ResetPassword?reset_token=",
         "mysqlConnection": {

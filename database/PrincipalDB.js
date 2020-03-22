@@ -80,7 +80,7 @@ exports.createTeacher = async function (teacherObj, userid, accountid) {
     return db.transaction(async function (conn) {
         let result = await checkAdminWithAccount(userid, accountid);
         if (result == 1) {
-            var r = await db.setQuery(conn, 'CALL SQSP_CreateTeacher(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            var r = await db.setQuery(conn, 'CALL SQSP_CreateTeacher(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         [teacherObj.firstname,
         teacherObj.lastname,
         teacherObj.emailid,
@@ -99,11 +99,16 @@ exports.createTeacher = async function (teacherObj, userid, accountid) {
         teacherObj.status,
         teacherObj.images,
         teacherObj.classid,
-        teacherObj.section
+        teacherObj.section,
+        teacherObj.salary
         ]);
+        if(r[0][0].userid){
             let loopUpEntry = { "accountid": accountid, "userid": r[0][0].userid };
             let results = await db.setQuery(conn, 'INSERT INTO teacher_principal SET ?', loopUpEntry);
             return results.affectedRows;
+        }else{
+            return 0
+        }
         } else {
             return 0;
         }

@@ -76,17 +76,24 @@ exports.updateFeeDetails = async function (session, accountid, feeObject) {
     return result.affectedRows;
 }
 //get Student fee details
-exports.getStudentFeeDetails = function (adharnumber, session, accountid) {
+exports.getStudentFeeDetails = function (adharnumber, session, accountid, userrole) {
     return db.transaction(async function (conn) {
-        let studentData = await db.setQuery(conn, 'select * from userdetails where adharnumber = ? and session = ? and status !=?', [adharnumber, session,9]);
-        let feeStructure = await db.setQuery(conn, 'select * from feestructure where class = ? and accountid = ? and session = ?', [studentData[0].classid, accountid, session]);
-        let results = await db.setQuery(conn, 'select * from studentfee where adharnumber = ? and session = ?', [adharnumber, session]);
-        let feeData = {
-            student: studentData,
-            feeStructure: feeStructure,
-            feeDetails: results
+        let studentData = await db.setQuery(conn, 'select * from userdetails where adharnumber = ? and session = ? and status !=? and userrole = ?', [adharnumber, session,9, userrole]);
+        if(studentData[0]){
+            let feeStructure = await db.setQuery(conn, 'select * from feestructure where class = ? and accountid = ? and session = ?', [studentData[0].classid, accountid, session]);
+            let results = await db.setQuery(conn, 'select * from studentfee where adharnumber = ? and session = ?', [adharnumber, session]);
+            let feeData = {
+                student: studentData,
+                feeStructure: feeStructure,
+                feeDetails: results
+            }
+            return feeData;
+        }else {
+            return  feeData = {
+                student: []
+            }
         }
-        return feeData;
+
     });
 }
 //get monthly fee based on selected month
@@ -103,7 +110,7 @@ exports.payStudentFee = function (adharnumber, session, studentFeeObj, feeObj) {
     return db.transaction(async function (conn) {
         let checkstudentfee = await db.setQuery(conn, `select ${studentFeeObj.monthName} from studentfee where adharnumber = ? and session = ?`, [adharnumber, session]);
         if (checkstudentfee.length > 0) {
-            let result = await db.setQuery(conn, 'update studentfee set ? where adharnumber = ? and session = ?', [feeObj, adharnumber, session]);
+            let result = await db.setQuery(conn, `update studentfee set ${studentFeeObj.monthName} = ${studentFeeObj.selectedmonthfee} where adharnumber = ? and session = ?`, [adharnumber, session]);
             return result.affectedRows;
         }
         else {
@@ -150,7 +157,7 @@ exports.getFeeDetailsForPrint = async function (adharnumber, session, accountid)
 //get students list of class
 exports.getStudentsListOfClass = async function (accountid, userid, classid, section, session) {
     return db.transaction(async function (conn) {
-    let classTeacher = await db.setQuery(conn, 'select userid from userdetails where userid in(select userid from teacher_principal where accountid = ?) and userrole = 3 and classid = ? and section=?',[accountid, classid, section]);
+    let classTeacher = await db.setQuery(conn, 'select userid from userdetails where userid in(select userid from teacher_principal where accountid = ?) and userrole = 3 and classid = ? and section=? and session = ?',[accountid, classid, section, session]);
     if(classTeacher){
             let studentList  = await db.setQuery(conn, 'select * from userdetails where userid in(select studentid from student_teacher where teacherid = ?)',[classTeacher[0].userid]);
             return studentList
@@ -160,22 +167,30 @@ exports.getStudentsListOfClass = async function (accountid, userid, classid, sec
 
 //get Student fee details 
 exports.getFullFeeDetails = function (accountid, classid, section, session) {
-    console.log(accountid, classid, section, session)
     return db.transaction(async function (conn) {
         let classTeacher = await db.setQuery(conn, 'select userid from userdetails where userid in(select userid from teacher_principal where accountid = ?) and userrole = 3 and classid = ? and section=? and session = ?',[accountid, classid, section, session]);
-        console.log('classTeacher',classTeacher)
         if(classTeacher){
-            var student = await db.setQuery(conn, 'select adharnumber from userdetails where userid IN(select studentid from student_teacher where teacherid = ?) and session = ?', [classTeacher[0].userid, session]);
+            var student = await db.setQuery(conn, 'select adharnumber, firstname, lastname, images, busservice, route from userdetails where userid IN(select studentid from student_teacher where teacherid = ?) and session = ?', [classTeacher[0].userid, session]);
             if (student.length > 0) {
                 var adharArray = [];
+                var routeArray = []
                 student.forEach((row) => {
+                    if(row.busservice == 2){
+                        routeArray.push(row.route)
+                    }else{
+                        routeArray.push(0)
+                    }
                     adharArray.push(row.adharnumber)
                 })
                 let sumFeeDetails = await db.setQuery(conn, `select * from feestructure where accountid = ? and class = ? and session = ?`, [accountid, classid, session]);
                 let results = await db.setQuery(conn, `select * from studentfee where adharnumber IN(${adharArray}) and session = ?`, [session]);
+                let transport = await db.setQuery(conn, `select * from transportfee where transportfeeid IN(${routeArray}) and accountid = ? and session = ?`, [accountid, session]);
+
                 let feeData = {
                     feeStructure: sumFeeDetails,
-                    submittedfee: results
+                    submittedfee: results,
+                    student: student,
+                    transport:transport
                 }
                 return feeData;
             } else {
@@ -185,4 +200,76 @@ exports.getFullFeeDetails = function (accountid, classid, section, session) {
             return 0;
         }
     });
+}
+
+//Create Transport Fee
+exports.createTranssportFee = async function (feeObject) {
+    let result = await db.query('insert into transportfee set ? ', [feeObject]);
+    return result.affectedRows;
+}
+
+//get Transport Fee
+exports.getTranssportFee = async function (accountid, session) {
+    let result = await db.query('select * from transportfee where accountid = ? and session = ?', [accountid, session]);
+    return result;
+}
+
+//delete Transport Fee
+exports.deleteTranssportFee = async function (accountid, session, userid, transportfeeid) {
+    let result = await db.query('delete from transportfee where accountid = ? and session = ? and userid = ? and transportfeeid = ?', [accountid, session, userid, transportfeeid]);
+    return result.affectedRows;
+}
+
+//get Transport Fee
+exports.getTranssportFeeById = async function (accountid, session, userid, transportfeeid) {
+    let result = await db.query('select * from transportfee where accountid = ? and session = ? and userid = ? and transportfeeid = ?', [accountid, session, userid, transportfeeid]);
+    return result;
+}
+
+//update Transport Fee by IB
+exports.updateTranssportFeeById = async function (feeObj, accountid, session, userid, transportfeeid) {
+    let result = await db.query('update transportfee set ? where accountid = ? and session = ? and userid = ? and transportfeeid = ?', [feeObj, accountid, session, userid, transportfeeid]);
+    return result.affectedRows;
+}
+
+//Create expense
+exports.createExpense = async function (expenseObj) {
+    let result = await db.query('insert into expensedetails set ? ', [expenseObj]);
+    return result.affectedRows;
+}
+
+//get expense
+exports.getExpense = async function (accountid, session) {
+    let result = await db.query('select * from expensedetails where accountid = ? and session = ?', [accountid, session]);
+    return result;
+}
+
+//delete expense
+exports.deleteExpense = async function (accountid, session, userid, expensedetailsid) {
+    let result = await db.query('delete from expensedetails where accountid = ? and session = ? and userid = ? and expensedetailsid = ?', [accountid, session, userid, expensedetailsid]);
+    return result.affectedRows;
+}
+
+//get expense by ID
+exports.getExpenxeById = async function (accountid, session, userid, expensedetailsid) {
+    let result = await db.query('select * from expensedetails where accountid = ? and session = ? and userid = ? and expensedetailsid = ?', [accountid, session, userid, expensedetailsid]);
+    return result;
+}
+
+//update Expense by IB
+exports.updateExpenseById = async function (feeObj, accountid, session, userid, expensedetailsid) {
+    let result = await db.query('update expensedetails set ? where accountid = ? and session = ? and userid = ? and expensedetailsid = ?', [feeObj, accountid, session, userid, expensedetailsid]);
+    return result.affectedRows;
+}
+
+//get staff salary
+exports.getStaffSalary = async function (accountid, session) {
+    let staffDetails = await db.query('select * from userdetails where userid in(select userid from teacher_principal where accountid = ?) and session = ?',[accountid, session]);
+    return staffDetails;
+}
+
+//get transport fee
+exports.getTransportFee = async function (accountid, adharnumber, session) {
+    let result = await db.query('select fee from transportfee where transportfeeid = (select route from userdetails where adharnumber = ? and session = ?)',[adharnumber, session]);
+    return result;
 }

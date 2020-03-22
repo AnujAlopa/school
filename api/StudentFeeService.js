@@ -133,8 +133,8 @@ router.put("/updatefeedetails", isAccountantOrTeacher, async function (req, res)
     }
 })
 //get Student fee details
-router.get("/:adharnumber/feedetails", async function (req, res) {
-    let result = await studentFeeDB.getStudentFeeDetails(req.params.adharnumber, JSON.parse(req.user.configdata).session, req.user.accountid);
+router.get("/:adharnumber/feedetails", isAccountantOrTeacher, isStudentBelongsToSameSchool, async function (req, res) {
+    let result = await studentFeeDB.getStudentFeeDetails(req.params.adharnumber, JSON.parse(req.user.configdata).session, req.user.accountid, UserEnum.UserRoles.Student);
     if (result.student.length > 0) {
         var s = result.student[0];
         var f = result.feeDetails[0];
@@ -147,7 +147,8 @@ router.get("/:adharnumber/feedetails", async function (req, res) {
             dob: encrypt.decrypt(s.dob),
             cellnumber: encrypt.decrypt(s.cellnumber),
             gender: s.gender,
-            adharnumber: s.adharnumber
+            adharnumber: s.adharnumber,
+            busservice: s.busservice
         }
         if (result.feeStructure.length > 0) {
             var studentFeeStructure = {
@@ -291,7 +292,8 @@ router.get("/getstudentslist/:classid/:section", async function (req, res) {
                 status: row.status,
                 images:row.images,
                 classid: row.classid,
-                section: row.section
+                section: row.section,
+                busservice: row.busservice
             });
         });
         res.status(200).json({ status: 1, statusDescription: resultObj });
@@ -306,9 +308,17 @@ router.get("/getfullfeedetails/:classid/:section", async function (req, res) {
     if (result) {
         var resultObj = [];
         var a = result.feeStructure[0];
+        setRoute = (value) =>{
+            let fee
+            result.transport.map((item)=>{
+                if(value == item.transportfeeid){
+                    fee = item.fee
+                }
+            })
+            return fee;
+        }
         var feeSum = parseInt(a.january) + a.february + a.march + a.april + a.may + a.june + a.july + a.august + a.september + a.october + a.november + a.december;
-
-        result.submittedfee.forEach(function (row) {
+        result.submittedfee.forEach(function (row, index) {
             resultObj.push({
                 studentid: row.studentid,
                 adharnumber: row.adharnumber,
@@ -325,7 +335,11 @@ router.get("/getfullfeedetails/:classid/:section", async function (req, res) {
                 november: row.november,
                 december: row.december,
                 submittedSum: row.january + row.february + row.march + row.april + row.may + row.june + row.july + row.august + row.september + row.october + row.november + row.december,
-                totalFee: feeSum
+                totalFee: feeSum,
+                name: encrypt.decrypt(result.student[index].firstname) + " " + encrypt.decrypt(result.student[index].lastname),
+                images: result.student[index].images,
+                busservice: result.student[index].busservice,
+                transport: result.student[index].busservice == 2&& setRoute(result.student[index].route)
             });
         });
         res.status(200).json({ status: 1, statusDescription: resultObj });
@@ -334,4 +348,226 @@ router.get("/getfullfeedetails/:classid/:section", async function (req, res) {
     }
 })
 
+//create transport fee
+router.post("/createtransportfee", isAccountantOrTeacher, async function (req, res) {
+    let transportFeeObj = {
+        accountid: req.user.accountid,
+        userid: req.user.userid,
+        route: encrypt.encrypt(req.body.route),
+        fee: req.body.fee,
+        vehiclenumber: encrypt.encrypt(req.body.vehiclenumber),
+        drivername: encrypt.encrypt(req.body.drivername),
+        drivernumber: encrypt.encrypt(req.body.drivernumber),
+        driversalary: req.body.driversalary,
+        vehicletype: req.body.vehicletype,
+        vehiclecolor: req.body.vehiclecolor,
+        vehicleexpense: req.body.vehicleexpense,
+        session: JSON.parse(req.user.configdata).session
+    }
+    let result = await studentFeeDB.createTranssportFee(transportFeeObj);
+    if (result == 1) {
+        res.status(200).json({ status: 1, statusDescription: "Transport Fee has been submitted successfully." });
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to submit the fee." });
+    }
+})
+
+//get transport fee
+router.get("/gettransportfee", isAccountantOrTeacher, async function (req, res) {
+    let result = await studentFeeDB.getTranssportFee(req.user.accountid, JSON.parse(req.user.configdata).session);
+    if (result.length) {
+        let resultObj = [];
+        result.forEach(function (row) {
+            resultObj.push({
+                route: encrypt.decrypt(row.route),
+                fee: row.fee,
+                transportfeeid: row.transportfeeid,
+                vehiclenumber: encrypt.decrypt(row.vehiclenumber),
+                drivername: encrypt.decrypt(row.drivername),
+                drivernumber: encrypt.decrypt(row.drivernumber),
+                driversalary: row.driversalary,
+                vehicletype: row.vehicletype,
+                vehiclecolor: row.vehiclecolor,
+                vehicleexpense: row.vehicleexpense
+            });
+        });
+        res.status(200).json({ status: 1, statusDescription: resultObj});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to get the fee." });
+    }
+})
+
+//delete transport fee
+router.delete("/deletetransportfee/:transportfeeid", isAccountantOrTeacher, async function (req, res) {
+    let result = await studentFeeDB.deleteTranssportFee(req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.transportfeeid);
+    if (result === 1) {
+        res.status(200).json({ status: 1, statusDescription: "Transport fee has been deleted successfully."});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to delete the fee." });
+    }
+})
+
+//get transport fee
+router.get("/gettetransportfee/:transportfeeid", isAccountantOrTeacher, async function (req, res) {
+    let result = await studentFeeDB.getTranssportFeeById(req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.transportfeeid);
+    if (result.length) {
+        let resultObj = [];
+        result.forEach(function (row) {
+            resultObj.push({
+                route: encrypt.decrypt(row.route),
+                fee: row.fee,
+                transportfeeid: row.transportfeeid,
+                vehiclenumber: encrypt.decrypt(row.vehiclenumber),
+                drivername: encrypt.decrypt(row.drivername),
+                drivernumber: encrypt.decrypt(row.drivernumber),
+                driversalary: row.driversalary,
+                vehicletype: row.vehicletype,
+                vehiclecolor: row.vehiclecolor,
+                vehicleexpense: row.vehicleexpense
+            });
+        });
+        res.status(200).json({ status: 1, statusDescription: resultObj});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to delete the fee." });
+    }
+})
+
+//update transport fee
+router.put("/updatetransportfee/:transportfeeid", isAccountantOrTeacher, async function (req, res) {
+    let feeObj = {
+        route: encrypt.encrypt(req.body.route),
+        fee: req.body.fee,
+        vehiclenumber: encrypt.encrypt(req.body.vehiclenumber),
+        drivername: encrypt.encrypt(req.body.drivername),
+        drivernumber: encrypt.encrypt(req.body.drivernumber),
+        driversalary: req.body.driversalary,
+        vehicletype: req.body.vehicletype,
+        vehiclecolor: req.body.vehiclecolor,
+        vehicleexpense: req.body.vehicleexpense,
+        session: JSON.parse(req.user.configdata).session
+    }
+    let result = await studentFeeDB.updateTranssportFeeById(feeObj, req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.transportfeeid);
+    if (result === 1) {
+        res.status(200).json({ status: 1, statusDescription: "Transport fee has been updated successfully."});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to update the fee." });
+    }
+})
+
+//create expense
+router.post("/createexpense", isAccountantOrTeacher, async function (req, res) {
+    let transportFeeObj = {
+        accountid: req.user.accountid,
+        userid: req.user.userid,
+        expense: req.body.expense,
+        expenseamount: req.body.expenseamount,
+        expensedate: req.body.expensedate,
+        session: JSON.parse(req.user.configdata).session
+    }
+    let result = await studentFeeDB.createExpense(transportFeeObj);
+    if (result == 1) {
+        res.status(200).json({ status: 1, statusDescription: "Expense has been submitted successfully." });
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to submit the expense." });
+    }
+})
+
+//get expense
+router.get("/getexpense", isAccountantOrTeacher, async function (req, res) {
+    let result = await studentFeeDB.getExpense(req.user.accountid, JSON.parse(req.user.configdata).session);
+    if (result.length) {
+        let resultObj = [];
+        result.forEach(function (row) {
+            resultObj.push({
+                expensedetailsid: row.expensedetailsid,
+                expense: row.expense,
+                expenseamount: row.expenseamount,
+                expensedate: row.expensedate
+            });
+        });
+        res.status(200).json({ status: 1, statusDescription: resultObj});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to get the fee." });
+    }
+})
+
+//delete expense
+router.delete("/deleteexpense/:expensedetailsid", isAccountantOrTeacher, async function (req, res) {
+    let result = await studentFeeDB.deleteExpense(req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.expensedetailsid);
+    if (result === 1) {
+        res.status(200).json({ status: 1, statusDescription: "Expense has been deleted successfully."});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to delete the expense." });
+    }
+})
+
+//get transport fee
+router.get("/getentrance/:expensedetailsid", isAccountantOrTeacher, async function (req, res) {
+    let result = await studentFeeDB.getExpenxeById(req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.expensedetailsid);
+    if (result.length) {
+        let resultObj = [];
+        result.forEach(function (row) {
+            resultObj.push({
+                expensedetailsid: row.expensedetailsid,
+                expense: row.expense,
+                expenseamount: row.expenseamount,
+                expensedate: row.expensedate
+            });
+        });
+        res.status(200).json({ status: 1, statusDescription: resultObj});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to delete the expense." });
+    }
+})
+
+//update Expense
+router.put("/expense/:expensedetailsid", isAccountantOrTeacher, async function (req, res) {
+    let feeObj = {
+        accountid: req.user.accountid,
+        userid: req.user.userid,
+        expense: req.body.expense,
+        expenseamount: req.body.expenseamount,
+        expensedate: req.body.expensedate,
+        session: JSON.parse(req.user.configdata).session
+    }
+    let result = await studentFeeDB.updateExpenseById(feeObj, req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.expensedetailsid);
+    if (result === 1) {
+        res.status(200).json({ status: 1, statusDescription: "Expense has been updated successfully."});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to update the expense." });
+    }
+})
+
+//get expense
+router.get("/getstaffsalary", isAccountantOrTeacher, async function (req, res) {
+    let result = await studentFeeDB.getStaffSalary(req.user.accountid, JSON.parse(req.user.configdata).session);
+    if (result.length) {
+        let resultObj = [];
+        result.forEach(function (row) {
+            resultObj.push({
+                firstname: row.firstname,
+                lastname: row.lastname,
+                cellnumber: encrypt.decrypt(row.cellnumber),
+                emailid:encrypt.decrypt(row.emailid),
+                adharnumber: row.adharnumber,
+                salary: row.salary,
+                gender: row.gender,
+                userrole: row.userrole
+            });
+        });
+        res.status(200).json({ status: 1, statusDescription: resultObj});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to get the fee." });
+    }
+})
+
+//get transport fee
+router.get("/getstudenttransportfee/:adharnumber", isAccountantOrTeacher, async function (req, res) {
+    let result = await studentFeeDB.getTransportFee(req.user.accountid, req.params.adharnumber, JSON.parse(req.user.configdata).session);
+    if (result.length) {
+        res.status(200).json({ status: 1, statusDescription: result});
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to get the fee." });
+    }
+})
 module.exports = router;
