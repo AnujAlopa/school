@@ -248,7 +248,8 @@ router.get("/:accountid/getteacherdetailforupdate/:teacherid", isPrincipal, chec
             userrole: row.userrole,
             localaddress: row.localaddress,
             parmanentaddress: row.parmanentaddress,
-            images:row.images
+            images:row.images,
+            salary: row.salary
         };
         res.status(200).json({ status: 1, statusDescription: teacherObj })
     } else {

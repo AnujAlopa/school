@@ -562,7 +562,7 @@ router.get("/getstaffsalary", isAccountantOrTeacher, async function (req, res) {
 })
 
 //get transport fee
-router.get("/getstudenttransportfee/:adharnumber", isAccountantOrTeacher, async function (req, res) {
+router.get("/getstudenttransportfee/:adharnumber", async function (req, res) {
     let result = await studentFeeDB.getTransportFee(req.user.accountid, req.params.adharnumber, JSON.parse(req.user.configdata).session);
     if (result.length) {
         res.status(200).json({ status: 1, statusDescription: result});

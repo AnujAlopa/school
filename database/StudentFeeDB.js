@@ -169,7 +169,7 @@ exports.getStudentsListOfClass = async function (accountid, userid, classid, sec
 exports.getFullFeeDetails = function (accountid, classid, section, session) {
     return db.transaction(async function (conn) {
         let classTeacher = await db.setQuery(conn, 'select userid from userdetails where userid in(select userid from teacher_principal where accountid = ?) and userrole = 3 and classid = ? and section=? and session = ?',[accountid, classid, section, session]);
-        if(classTeacher){
+        if(classTeacher[0]){
             var student = await db.setQuery(conn, 'select adharnumber, firstname, lastname, images, busservice, route from userdetails where userid IN(select studentid from student_teacher where teacherid = ?) and session = ?', [classTeacher[0].userid, session]);
             if (student.length > 0) {
                 var adharArray = [];

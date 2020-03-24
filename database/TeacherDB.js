@@ -1,11 +1,8 @@
 var db = require('./db.js');
 
 exports.checkTeacherStudentRelation = async function (studentid, accountid) {
-    console.log(studentid, accountid)
     let studentAccountId = await db.query('select accountid from teacher_principal where userid = (select teacherid from student_teacher where studentid = ?)', [studentid])
-    console.log('studentAccountId', studentAccountId)
     let result = studentAccountId[0].accountid.localeCompare(accountid);
-    console.log(result)
     if (result === 0) {
         return true
     } else if (result === -1 || result === undefined) {
@@ -220,18 +217,27 @@ exports.saveStusentAttendance = async function (results, session) {
 //get Student fee details for Teacher
 exports.getFeeDetailsForTeacher = function (userid, session, accountid) {
     return db.transaction(async function (conn) {
-        var student = await db.setQuery(conn, 'select adharnumber, classid from userdetails where userid IN(select studentid from student_teacher where teacherid = ?) and session = ?', [userid, session]);
+        var student = await db.setQuery(conn, 'select adharnumber, classid, firstname, lastname, images, busservice, route from userdetails where userid IN(select studentid from student_teacher where teacherid = ?) and session = ?', [userid, session]);
         if (student.length > 0) {
             var adharArray = [];
-            var classid = student[0].classid
+            var routeArray = []
             student.forEach((row) => {
+                if(row.busservice == 2){
+                    routeArray.push(row.route)
+                }else{
+                    routeArray.push(0)
+                }
                 adharArray.push(row.adharnumber)
             })
-            let sumFeeDetails = await db.setQuery(conn, `select * from feestructure where accountid = ? and class = ? and session = ?`, [accountid, classid, session]);
+            let sumFeeDetails = await db.setQuery(conn, `select * from feestructure where accountid = ? and class = ? and session = ?`, [accountid, student[0].classid, session]);
             let results = await db.setQuery(conn, `select * from studentfee where adharnumber IN(${adharArray}) and session = ?`, [session]);
+            let transport = await db.setQuery(conn, `select * from transportfee where transportfeeid IN(${routeArray}) and accountid = ? and session = ?`, [accountid, session]);
+
             let feeData = {
                 feeStructure: sumFeeDetails,
-                submittedfee: results
+                submittedfee: results,
+                student: student,
+                transport:transport
             }
             return feeData;
         } else {
@@ -301,7 +307,7 @@ exports.saveDailyAttendance = async function (attendanceObj) {
         for (let i = 0; i < attendanceObj.length; i++) {
             let school = await db.setQuery(conn, 'select * from monthlyattendance where accountid = ? and teacherid = ? and studentid = ? and classid = ? and section = ? and session = ?', [attendanceObj[i].accountid, attendanceObj[i].teacherid, attendanceObj[i].studentid, attendanceObj[i].classid, attendanceObj[i].section, attendanceObj[i].session]);
             let currentMonthNumber = new Date().getMonth();
-            let currentDayNumber = new Date().getDay().toString();
+            let currentDayNumber = new Date().getDate().toString();
             let monthData = null
             if (currentMonthNumber === 0) {
                 monthData = school[0].january
@@ -447,8 +453,7 @@ exports.getDailyAttendance = async function (accountid, teacherid, session) {
         } else if (currentMonthNumber === 11) {
             monthName = 'december'
         }
-        let getAttendance = await db.setQuery(conn, `select ${monthName} from monthlyattendance where accountid = ? and teacherid = ? and session = ?`, [accountid, teacherid, session]);
-
+        let getAttendance = await db.setQuery(conn, `select ${monthName}, studentid from monthlyattendance where accountid = ? and teacherid = ? and session = ?`, [accountid, teacherid, session]);
         return getAttendance;
     })
 }

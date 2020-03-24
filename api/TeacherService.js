@@ -332,9 +332,18 @@ router.get("/getfeedetailsforteacher", async function (req, res) {
     if (result) {
         var resultObj = [];
         var a = result.feeStructure[0];
+        setRoute = (value) =>{
+            let fee
+            result.transport.map((item)=>{
+                if(value == item.transportfeeid){
+                    fee = item.fee
+                }
+            })
+            return fee;
+        }
         var feeSum = parseInt(a.january) + a.february + a.march + a.april + a.may + a.june + a.july + a.august + a.september + a.october + a.november + a.december;
 
-        result.submittedfee.forEach(function (row) {
+        result.submittedfee.forEach(function (row, index) {
             resultObj.push({
                 studentid: row.studentid,
                 adharnumber: row.adharnumber,
@@ -351,7 +360,11 @@ router.get("/getfeedetailsforteacher", async function (req, res) {
                 november: row.november,
                 december: row.december,
                 submittedSum: row.january + row.february + row.march + row.april + row.may + row.june + row.july + row.august + row.september + row.october + row.november + row.december,
-                totalFee: feeSum
+                totalFee: feeSum,
+                name: encrypt.decrypt(result.student[index].firstname) + " " + encrypt.decrypt(result.student[index].lastname),
+                images: result.student[index].images,
+                busservice: result.student[index].busservice,
+                transport: result.student[index].busservice == 2&& setRoute(result.student[index].route)
             });
         });
         res.status(200).json({ status: 1, statusDescription: resultObj });
@@ -592,12 +605,11 @@ router.post('/savedailyattendance', async function (req, res) {
             session: JSON.parse(req.user.configdata).session,
         })
     }
-console.log('attendanceObj',attendanceObj)
     let result = await teacherDB.saveDailyAttendance(attendanceObj);
     if (result == 1) {
-        res.status(200).json({ status: 1, statusDescription: "Student has been activated successfully." });
+        res.status(200).json({ status: 1, statusDescription: "Attendance has been saved successfully." });
     } else {
-        res.status(200).json({ status: 0, statusDescription: "Student is not Reactivated." });
+        res.status(200).json({ status: 0, statusDescription: "Attendance is not saved." });
     }
 });
 

@@ -121,7 +121,7 @@ exports.updateTeacherDetails = async function (userid, teacherObj) {
 }
 //get teacher details for update by principal
 exports.getTeacherDetailForUpdate = async function (teacherid) {
-    let result = await db.query('select userid, firstname, lastname, cellnumber, adharnumber, images,emailid, status, userrole, gender, classid, subject, qualification, dob, parmanentaddress, localaddress from userdetails where userid = ?', [teacherid]);
+    let result = await db.query('select userid, firstname, lastname, cellnumber, adharnumber, images,emailid, status, userrole, gender, classid, subject, qualification, dob, parmanentaddress, localaddress, salary from userdetails where userid = ?', [teacherid]);
     return result;
 }
 //get assigned class

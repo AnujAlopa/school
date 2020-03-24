@@ -148,7 +148,8 @@ router.get("/:adharnumber/studentfeedetails", isStudent, async function (req, re
                     classid: s.classid,
                     section: s.section,
                     localaddress: s.localaddress,
-                    parmanentaddress: s.parmanentaddress
+                    parmanentaddress: s.parmanentaddress,
+                    busservice: s.busservice
                 }
                 if(result.feeStructure.length>0){
                     var studentFeeStructure = {
