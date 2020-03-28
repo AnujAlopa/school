@@ -130,9 +130,17 @@ exports.getAssignedClass = async function (userid) {
     return results;
 }
 //Assign class to teacher
-exports.assignClassToTeacher = async function (teacherid, classObject) {
-    let result = await db.query('update userdetails set ? where userid = ?', [classObject, teacherid]);
-    return result.affectedRows
+exports.assignClassToTeacher = async function (teacherid, classObject, accountid) {
+    return db.transaction(async function (conn) {
+        let isClassAssigned = await db.setQuery(conn, 'select userid from userdetails where userid in(select userid from teacher_principal where accountid = ?) and classid = ? and section = ?', [accountid, classObject.classid, classObject.section]);
+        if(isClassAssigned.length){
+            return 0
+        }else{
+        let result = await db.setQuery(conn, 'update userdetails set ? where userid = ?', [classObject, teacherid]);
+         return result.affectedRows
+        }
+    })
+
 }
 //get subjects by selected class
 exports.getSubjectForClass = async function (userid, classes) {

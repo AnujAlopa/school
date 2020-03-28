@@ -232,7 +232,6 @@ exports.getFeeDetailsForTeacher = function (userid, session, accountid) {
             let sumFeeDetails = await db.setQuery(conn, `select * from feestructure where accountid = ? and class = ? and session = ?`, [accountid, student[0].classid, session]);
             let results = await db.setQuery(conn, `select * from studentfee where adharnumber IN(${adharArray}) and session = ?`, [session]);
             let transport = await db.setQuery(conn, `select * from transportfee where transportfeeid IN(${routeArray}) and accountid = ? and session = ?`, [accountid, session]);
-
             let feeData = {
                 feeStructure: sumFeeDetails,
                 submittedfee: results,

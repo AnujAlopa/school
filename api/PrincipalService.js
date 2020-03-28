@@ -267,14 +267,14 @@ router.get("/:accountid/:teacherid/getAssignedClass", isPrincipal, checkTeacherB
 
 });
 //assign class by principal
-router.post("/:accountid/:teacherid/assignclass", isPrincipal, checkTeacherBelongsToAccount, async function (req, res) {
+router.post("/:teacherid/assignclasstofaculty", isPrincipal, checkTeacherBelongsToAccount, async function (req, res) {
     let classObject = {
         classid: req.body.selectedClass,
         section: req.body.selectedSection
     }
-    let result = await principalDB.assignClassToTeacher(req.params.teacherid, classObject);
+    let result = await principalDB.assignClassToTeacher(req.params.teacherid, classObject, req.user.accountid);
     if (result == 1) {
-        res.status(200).json({ status: 1, statusDescription: 'Class has been assign successfully.' });
+        res.status(200).json({ status: 1, statusDescription: 'Class has been assigned successfully.' });
     } else {
         res.status(200).json({ status: 0, statusDescription: 'This class and section is already assigned some other teacher.' });
     }

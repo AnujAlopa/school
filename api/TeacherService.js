@@ -341,7 +341,9 @@ router.get("/getfeedetailsforteacher", async function (req, res) {
             })
             return fee;
         }
-        var feeSum = parseInt(a.january) + a.february + a.march + a.april + a.may + a.june + a.july + a.august + a.september + a.october + a.november + a.december;
+        if(result.feeStructure.length){
+            var feeSum = parseInt(a.january) + a.february + a.march + a.april + a.may + a.june + a.july + a.august + a.september + a.october + a.november + a.december;
+        }
 
         result.submittedfee.forEach(function (row, index) {
             resultObj.push({

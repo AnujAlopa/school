@@ -9,8 +9,12 @@ exports.getAllAccountsForSuperAdmin = async function () {
 exports.getAllProviderByAccountSuperAdminWithDetails = async function () {
     return db.transaction(async function (conn) {
     let account = await db.setQuery(conn, 'select accountid from account where parentaccountid = "0"');
-    let result = await db.setQuery(conn, 'select a.status, a.accountid,a.accountname, a.accountrefnumber, a.accountype, a.createddatetime, d.userid, d.firstname, d.lastname, d.cellnumber, d.emailid from account a inner join account a1 on a.parentaccountid = a1.accountid inner join doctor d on a.accountadmin = d.userid where a.parentaccountid =  ?', [account[0].accountid]);
-    return result;
+    if(account){
+        let result = await db.setQuery(conn, 'select a.status, a.accountid,a.accountname, a.accountrefnumber, a.accountype, a.createddatetime, d.userid, d.firstname, d.lastname, d.cellnumber, d.emailid from account a inner join account a1 on a.parentaccountid = a1.accountid inner join doctor d on a.accountadmin = d.userid where a.parentaccountid =  ?', [account[0].accountid]);
+        return result;
+    }else{
+        return 0;
+    }
     })
 };
 //get teachers for selected account
@@ -22,10 +26,12 @@ exports.getAllTeachersByAccountSuperAdmin = async function (accountid, callback)
 exports.getAllStudentsBySuperAdmin = async function (teacherid) {
     return db.transaction(async function (conn) {
     let classData = await db.setQuery(conn, 'select classid, section, session from userdetails where userid = ?', teacherid);
-    if (classData[0].classid) {
+    if (classData) {
         var results = await db.setQuery(conn, 'CALL SQSP_GetPatientlist(?,?,?,?)', [classData[0].classid, classData[0].section, classData[0].session, teacherid]);
+        return JSON.parse(JSON.stringify(results[0]));
+    }else{
+        return 0
     }
-    return JSON.parse(JSON.stringify(results[0]));
 })
 }
 //Create School account                
@@ -65,8 +71,12 @@ exports.getSchoolAccountDetailsForUpdate = async function (accountid) {
 exports.getAllSchoolAdminDetailsForManage = async function () {
     return db.transaction(async function (conn) {
     let account = await db.setQuery(conn, 'select accountid from account where parentaccountid = "0"');
-    let result = await db.setQuery(conn, 'select a.status, a.accountid,a.accountname, a.accountrefnumber, a.accountype, a.createddatetime, d.userid, d.firstname, d.lastname, d.cellnumber, d.emailid, d.images, d.adharnumber from account a inner join account a1 on a.parentaccountid = a1.accountid inner join userdetails d on a.accountadmin = d.userid where a.parentaccountid =  ?', [account[0].accountid]);
-    return result;
+    if(account){
+        let result = await db.setQuery(conn, 'select a.status, a.accountid,a.accountname, a.accountrefnumber, a.accountype, a.createddatetime, d.userid, d.firstname, d.lastname, d.cellnumber, d.emailid, d.images, d.adharnumber from account a inner join account a1 on a.parentaccountid = a1.accountid inner join userdetails d on a.accountadmin = d.userid where a.parentaccountid =  ?', [account[0].accountid]);
+        return result;
+    }else{
+        return 0;
+    }
     })
 };
 // Lock the admin

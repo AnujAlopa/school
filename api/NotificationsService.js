@@ -78,7 +78,7 @@ router.get("/getschoolnotificationsbyuserrole", isStudentOrTeacheroraccounttantO
     if(req.user.role === 2){
         notificationData = await notificationDB.getSchoolNotificationsForStudents(req.user.accountid, req.user.role, JSON.parse(req.user.configdata).session, req.user.userid);
     }else if(req.user.role === 3){
-        notificationData = await notificationDB.getSchoolNotificationsForTeacher(req.user.accountid, req.user.role, JSON.parse(req.user.configdata).session, req.user.userid);
+        notificationData = await notificationDB.getSchoolNotificationsForTeacher(req.user.accountid, req.user.role, JSON.parse(req.user.configdata).session);
     }else{
         notificationData = await notificationDB.getSchoolNotificationsForUser(req.user.accountid, req.user.role, JSON.parse(req.user.configdata).session);
     }

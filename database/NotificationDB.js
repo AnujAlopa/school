@@ -22,18 +22,18 @@ exports.getSchoolNotifications = async function(userid, accountid, session){
     return Result;
 }
 //get school Notification for student 
-exports.getSchoolNotificationsForStudents = async function(accountid, userrole, session, studentid){
-    let Result = await db.query('select * from schoolnotifications where accountid = ? and notificationuser = ? || notificationuser = ? and session = ? || userid = (select teacherid from student_teacher where studentid = ?)',[accountid, userrole, 10, session, studentid]);
+exports.getSchoolNotificationsForStudents = async function(accountid, userrole, session){
+    let Result = await db.query(`select * from schoolnotifications where accountid = ? and notificationuser in(${userrole}, 10) and session = ?`,[accountid, session]);
     return Result;
 }
 //get school Notification for Teacher 
-exports.getSchoolNotificationsForTeacher = async function(accountid, userrole, session, teacherid){
-    let Result = await db.query('select * from schoolnotifications where accountid = ? and notificationuser = ? || notificationuser = ? and session = ? || userid = ?',[accountid, userrole, 10, session, teacherid]);
+exports.getSchoolNotificationsForTeacher = async function(accountid, userrole, session){
+    let Result = await db.query(`select * from schoolnotifications where accountid = ? and notificationuser in(${userrole}, 10) and session = ?`,[accountid, session]);
     return Result;
 }
 //get school Notification for users 
 exports.getSchoolNotificationsForUser = async function(accountid, userrole, session){
-    let Result = await db.query('select * from schoolnotifications where accountid = ? and notificationuser = ? || notificationuser = ? and session = ?',[accountid, userrole, 10, session]);
+    let Result = await db.query(`select * from schoolnotifications where accountid = ? and notificationuser in(${userrole}, 10) and session = ?`,[accountid, session]);
     return Result;
 }
 //delete school Notification
