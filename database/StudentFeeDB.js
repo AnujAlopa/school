@@ -106,7 +106,7 @@ exports.getMonthlyFeeBasedOnSelectedMonth = function (adharnumber, session, acco
     });
 }
 //pay student fee
-exports.payStudentFee = function (adharnumber, session, studentFeeObj, feeObj) {
+exports.payStudentFee = function (adharnumber, session, studentFeeObj) {
     return db.transaction(async function (conn) {
         let checkstudentfee = await db.setQuery(conn, `select ${studentFeeObj.monthName} from studentfee where adharnumber = ? and session = ?`, [adharnumber, session]);
         if (checkstudentfee.length > 0) {

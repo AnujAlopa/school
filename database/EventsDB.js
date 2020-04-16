@@ -12,8 +12,8 @@ exports.getSchoolEventsById = async function(eventid, accountid, userid, session
     return Result;
 }
 //update school events
-exports.updateSchoolEvent = async function (eventsObjects, eventid, session) {
-    let Result = await db.query('update schoolevents set ? where accountid = ? and userid = ? and eventid = ? and session = ?', [eventsObjects, eventsObjects.accountid, eventsObjects.userid, eventid, session]);
+exports.updateSchoolEvent = async function (eventsObjects) {
+    let Result = await db.query('update schoolevents set ? where accountid = ? and userid = ? and eventid = ? and session = ?', [eventsObjects, eventsObjects.accountid, eventsObjects.userid, eventsObjects.eventid, eventsObjects.session]);
     return Result;
 }
 //get school events

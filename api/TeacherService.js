@@ -2,7 +2,7 @@ const router = require('express').Router();
 const teacherDB = require("../database/TeacherDB.js");
 const UserEnum = require('../lookup/UserEnum');
 const passwordHash = require('password-hash');
-const joiSchema = require('../apiJoi/teacherJoi.js');
+const joiSchema = require('../apiJoi/teacher.js');
 const middleWare = require('../apiJoi/middleWare.js');
 
 function isTeacherOrExamHead(req, res, next) {
@@ -12,7 +12,7 @@ function isTeacherOrExamHead(req, res, next) {
         return res.status(403).json({ status: 0, statusDescription: "Not Authenticated user." });
     }
 }
- function isTeacherOrExamHeadOrFeeAccount(req, res, next) {
+function isTeacherOrExamHeadOrFeeAccount(req, res, next) {
     if (req.user.role === UserEnum.UserRoles.Teacher || req.user.role === UserEnum.UserRoles.ExamHead || req.user.role === UserEnum.UserRoles.FeeAccount ) {
         next();
     } else {
@@ -27,6 +27,106 @@ async function isTeacherStudentRelated(req,res,next){
         return res.status(200).json({ status: 0, statusDescription: "Student and Teacher are not belongs to same account." });
     }    
 }
+async function isTeacherStudentRelatedBody(req,res,next){
+    let result = await teacherDB.checkTeacherStudentRelation(req.body.studentid, req.user.accountid);
+    if(result){
+        next();
+    }else{ 
+        return res.status(200).json({ status: 0, statusDescription: "Student and Teacher are not belongs to same account." });
+    }    
+}
+const studentObject = middleWare(joiSchema.studentObject, "body", true);
+const studentIdParams =  middleWare(joiSchema.studentIdParams, "params", true);
+const adharNumberParams =  middleWare(joiSchema.adharNumberParams, "params", true);
+const emailIdParams =  middleWare(joiSchema.emailIdParams, "params", true);
+const studentCreateResult = middleWare(joiSchema.studentCreateResult, "body", true);
+const studentCreateAttendance = middleWare(joiSchema.studentCreateAttendance, "body", false);
+const studentIdBody =  middleWare(joiSchema.studentIdBody, "body", true);
+const saveAttendanceObject =  middleWare(joiSchema.saveAttendanceObject, "body", true);
+
+
+//Student Registration
+router.post("/studentRegistration", isTeacherOrExamHead, studentObject, async function (req, res) {
+    let img = req.body.images;
+    var image;
+    if (img == null) {
+        image = img
+    } else if (img.length == 0) {
+        image = null
+    } else {
+        image = img
+    }
+    if(req.body.images !== '' && req.body.images != null){
+        var encryptimg =  image.replace(/^data:image\/[a-z]+;base64,/, "");
+    }
+    let studentObj = {
+        firstname: encrypt.encrypt(req.body.firstname),
+        lastname: encrypt.encrypt(req.body.lastname),
+        mothername: req.body.mothername,
+        fathername: req.body.fathername,
+        cellnumber: encrypt.encrypt(req.body.cellnumber),
+        username: encrypt.computeHash(req.body.adharnumber),
+        password: encrypt.getHashedPassword(req.body.adharnumber),
+        dob: encrypt.encrypt(req.body.dob),
+        adharnumber: req.body.adharnumber,
+        gender: req.body.gender,
+        religion: req.body.religion,
+        category: req.body.category,
+        locality: req.body.locality,
+        localaddress: req.body.localaddress,
+        parmanentaddress: req.body.parmanentaddress,
+        userid: req.user.userid,
+        userrole: UserEnum.UserRoles.Student,
+        status: UserEnum.UserStatus.Active,
+        images: encryptimg,
+        session:JSON.parse(req.user.configdata).session,
+        busservice: req.body.busservice,
+        route: req.body.route
+    }
+    let result = '';
+    if(req.body.studentid){
+        studentObj.studentid = req.body.studentid
+        result = await teacherDB.updateStusentRecord(studentObj);
+    }else{
+        result = await teacherDB.saveStusentDetails(studentObj, req.user.userid, req.user.accountid);
+    }
+    if (result) {
+        res.status(200).json({ status: 1, statusDescription: req.body.studentid?'Student has been updated successfully.':'Student has been created successfully.' });
+    } else {
+        res.status(200).json({ status: 0, statusDescription: 'Your principal is not assigned you any class.' });
+    }
+});
+// getting student information for update 
+router.get("/updateStudentDetails/:studentid", isTeacherOrExamHead, studentIdParams, isTeacherStudentRelated, async function (req, res) {
+    let result = await teacherDB.getStudentDetails(req.params.studentid, req.user.userid, JSON.parse(req.user.configdata).session);
+        if (result.length > 0) {
+            var resultObj = [];
+            result.forEach(function (row) {
+                resultObj.push({
+                    userid: row.userid,
+                    firstname: encrypt.decrypt(row.firstname),
+                    lastname: encrypt.decrypt(row.lastname),
+                    mothername: row.mothername,
+                    fathername: row.fathername,
+                    cellnumber: encrypt.decrypt(row.cellnumber),
+                    adharnumber: row.adharnumber,
+                    dob: encrypt.decrypt(row.dob),
+                    gender: row.gender,
+                    religion: row.religion,
+                    category: row.category,
+                    locality: row.locality,
+                    locaddress: row.localaddress,
+                    paraddress: row.parmanentaddress,
+                    images: row.images,
+                    busservice: row.busservice,
+                    route: row.route
+                });
+            });
+            res.status(200).json({ status: 1, statusDescription: resultObj });
+        } else {
+            res.status(200).json({ status: 0, statusDescription: 'Not able to get the data.' });
+        }
+    });
 //get Students for teacher
 router.get("/getmystudents", isTeacherOrExamHead, async function (req, res) {
     let result = await teacherDB.getAllStudents(req.user.userid, UserEnum.UserStatus.Active, JSON.parse(req.user.configdata).session);
@@ -86,11 +186,12 @@ router.get("/getmyinactivatedstudents", isTeacherOrExamHead, async function (req
         });
         res.status(200).json({ status: 1, statusDescription: resultObj });
     } else {
-        res.status(200).json({ status: 0, statusDescription: 'Not able to get the students.' });
+        res.status(200).json({ status: 0, statusDescription: 'No Inactivate Student fount of this class.' });
     }
 });
+
 //check adharnumber
-router.get("/getAdharnumber/:adharnumber", async function(req, res){
+router.get("/getAdharnumber/:adharnumber", adharNumberParams, async function(req, res){
 let result = await teacherDB.checkAddhar(req.params.adharnumber);
 if(result){
     res.status(200).json({ "isAdharNumberUsed": true });
@@ -98,134 +199,17 @@ if(result){
     res.status(200).json({ "isAdharNumberUsed": false });
 }
 })
+
 //check emailid 
-router.get("/getEmailId/:emailid", async function(req, res){
+router.get("/getEmailId/:emailid", emailIdParams, async function(req, res){
     let result = await teacherDB.checkEmailId(encrypt.encrypt(req.params.emailid));
     if(result){
         res.status(200).json({ "isEmailIdUsed": true });
     }else{
         res.status(200).json({ "isEmailIdUsed": false });
     }
-    })
-//Student Registration
-router.post("/studentRegistration", isTeacherOrExamHead, async function (req, res) {
-    let img = req.body.images;
-    var image;
-    if (img == null) {
-        image = img
-    } else if (img.length == 0) {
-        image = null
-    } else {
-        image = img
-    }
-    if(req.body.images !== ''){
-        var encryptimg =  image.replace(/^data:image\/[a-z]+;base64,/, "");
-    }
-    let student = {
-        firstname: encrypt.encrypt(req.body.firstname),
-        lastname: encrypt.encrypt(req.body.lastname),
-        mothername: req.body.mothername,
-        fathername: req.body.fathername,
-        cellnumber: encrypt.encrypt(req.body.cellnumber),
-        username: encrypt.computeHash(req.body.adharnumber),
-        password: encrypt.getHashedPassword(req.body.adharnumber),
-        dob: encrypt.encrypt(req.body.dob),
-        adharnumber: req.body.adharnumber,
-        gender: req.body.gender,
-        religion: req.body.religion,
-        category: req.body.category,
-        locality: req.body.locality,
-        localaddress: req.body.localaddress,
-        parmanentaddress: req.body.parmanentaddress,
-        userid: req.user.userid,
-        userrole: UserEnum.UserRoles.Student,
-        status: UserEnum.UserStatus.Active,
-        images: encryptimg,
-        session:JSON.parse(req.user.configdata).session,
-        busservice: req.body.busservice,
-        route: req.body.route
-    }
+})
 
-    let result = await teacherDB.saveStusentDetails(student, req.user.userid, req.user.accountid);
-    if (result) {
-        res.status(200).json({ status: 1, statusDescription: 'Student has been created successfully.' });
-    } else {
-        res.status(200).json({ status: 0, statusDescription: 'Your principal is not assigned you any class.' });
-    }
-});
-// Updating Student Information by class teacher
-router.post("/updateStudent", isTeacherOrExamHead, async function (req, res) {
-    let img = req.body.images;
-    var image;
-    if (img == null) {
-        image = img
-    } else if (img.length == 0) {
-        image = null
-    } else {
-        image = img
-    }
-    if(req.body.images !== null){
-    var encryptimg =  image.replace(/^data:image\/[a-z]+;base64,/, "");
-    }
-    var studentObj = {
-        studentid: req.body.studentid,
-        firstname: encrypt.encrypt(req.body.firstname),
-        lastname: encrypt.encrypt(req.body.lastname),
-        mothername: req.body.mothername,
-        fathername: req.body.fathername,
-        cellnumber: encrypt.encrypt(req.body.cellnumber),
-        dob: encrypt.encrypt(req.body.dob),
-        adharnumber: req.body.adharnumber,
-        gender: req.body.gender,
-        religion: req.body.religion,
-        category: req.body.category,
-        locality: req.body.locality,
-        localaddress: req.body.localaddress,
-        parmanentaddress: req.body.parmanentaddress,
-        userid: req.user.userid,
-        images: encryptimg,
-        busservice: req.body.busservice,
-        route: req.body.route
-    }
-
-    let result = await teacherDB.updateStusentRecord(studentObj);
-    if (result) {
-        res.status(200).json({ status: 1, statusDescription: 'Student has been updated successfully.' });
-    } else {
-        res.status(200).json({ status: 0, statusDescription: 'Not able to update the student details.' });
-    }
-});
-// getting student information for update 
-router.get("/updateStudentDetails/:studentid", isTeacherOrExamHead, isTeacherStudentRelated, async function (req, res) {
-let result = await teacherDB.getStudentDetails(req.params.studentid, req.user.userid, JSON.parse(req.user.configdata).session);
-    if (result.length > 0) {
-        var resultObj = [];
-        result.forEach(function (row) {
-            resultObj.push({
-                userid: row.userid,
-                firstname: encrypt.decrypt(row.firstname),
-                lastname: encrypt.decrypt(row.lastname),
-                mothername: row.mothername,
-                fathername: row.fathername,
-                cellnumber: encrypt.decrypt(row.cellnumber),
-                adharnumber: row.adharnumber,
-                dob: encrypt.decrypt(row.dob),
-                gender: row.gender,
-                religion: row.religion,
-                category: row.category,
-                locality: row.locality,
-                locaddress: row.localaddress,
-                paraddress: row.parmanentaddress,
-                images: row.images,
-                busservice: row.busservice,
-                route: row.route
-            });
-        });
-        res.status(200).json({ status: 1, statusDescription: resultObj });
-    } else {
-        res.status(200).json({ status: 0, statusDescription: 'Not able to get the data.' });
-    }
-});
 //get config details(Delete)
 router.get("/:teacherid/getconfigdetails", async function (req, res) {
        let result = await teacherDB.getconfigdetailsByAllUsers(req.params.teacherid);
@@ -246,7 +230,7 @@ router.get("/assignsubjects", isTeacherOrExamHead, async function (req, res) {
     }
 })
 //Save Student Result
-router.post("/studentResult/:studentid", isTeacherOrExamHead, isTeacherStudentRelated, middleWare(joiSchema.studentCreateResult, "body"), async function (req, res) {
+router.post("/studentResult", isTeacherOrExamHead, isTeacherStudentRelatedBody, studentCreateResult, async function (req, res) {
     var result;
     switch (req.body.subjectid) {
         case 1: result = { hindi: JSON.stringify([{totalMarks:req.body.totalMarks, obtainMarks:req.body.obtainMarks }])}
@@ -277,7 +261,7 @@ router.post("/studentResult/:studentid", isTeacherOrExamHead, isTeacherStudentRe
             break;
     }
     result.teacherid = req.user.userid,
-    result.studentid = req.params.studentid
+    result.studentid = req.body.studentid
     result.examinationtype = req.body.examinationtype
 let results = await teacherDB.saveStusentResult(result, JSON.parse(req.user.configdata).session);
     if (results) {
@@ -287,7 +271,7 @@ let results = await teacherDB.saveStusentResult(result, JSON.parse(req.user.conf
     }
 });
 //Save Student Attendance by class teacher
-router.post("/studentAttendance/:studentid", isTeacherOrExamHead, isTeacherStudentRelated, middleWare(joiSchema.studentCreateAttendance, "body"), async function (req, res) {
+router.post("/studentAttendance", isTeacherOrExamHead, isTeacherStudentRelatedBody, studentCreateAttendance, async function (req, res) {
     var result;
     switch (req.body.monthName) {
         case 1: result = { january: req.body.monthName, jtd: req.body.totalClasses, jpd: req.body.presentClasses };
@@ -318,7 +302,7 @@ router.post("/studentAttendance/:studentid", isTeacherOrExamHead, isTeacherStude
             break;
     }
     result.teacherid = req.user.userid,
-        result.studentid = req.params.studentid
+        result.studentid = req.body.studentid
     let attendance = await teacherDB.saveStusentAttendance(result, JSON.parse(req.user.configdata).session);
     if (attendance) {
         res.status(200).json({ status: 1, statusDescription: "Student attendance has been submitted successfully." });
@@ -547,8 +531,8 @@ router.post("/updateProfileDetails", isTeacherOrExamHeadOrFeeAccount, async (req
     }
 })
 //Inactivate student by class teacher
-router.post('/inactivatestudent/:studentid', isTeacherOrExamHead, isTeacherStudentRelated, async function (req, res) {
-    let result = await teacherDB.inactivateStudent(req.params.studentid, UserEnum.UserStatus.Inactive, UserEnum.UserRoles.Student);
+router.post('/inactivatestudent', isTeacherOrExamHead, studentIdBody, isTeacherStudentRelatedBody, async function (req, res) {
+    let result = await teacherDB.inactivateStudent(req.body.studentid, UserEnum.UserStatus.Inactive, UserEnum.UserRoles.Student);
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: "Student has been inactivated successfully." });
     } else {
@@ -556,8 +540,8 @@ router.post('/inactivatestudent/:studentid', isTeacherOrExamHead, isTeacherStude
     }
 });
 //Inactivate student by class teacher
-router.post('/reactivatestudent/:studentid', isTeacherOrExamHead, isTeacherStudentRelated, async function (req, res) {
-    let result = await teacherDB.reactivateStudent(req.params.studentid, UserEnum.StudentStatusEnum.active, UserEnum.UserRoles.Student);
+router.post('/reactivatestudent', isTeacherOrExamHead, studentIdBody, isTeacherStudentRelatedBody, async function (req, res) {
+    let result = await teacherDB.reactivateStudent(req.body.studentid, UserEnum.StudentStatusEnum.active, UserEnum.UserRoles.Student);
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: "Student has been activated successfully." });
     } else {
@@ -566,7 +550,7 @@ router.post('/reactivatestudent/:studentid', isTeacherOrExamHead, isTeacherStude
 });
 
 //get student Registration print details
-router.get("/:adharnumber/getstudentregistrationdetails", isTeacherOrExamHead, async function (req, res) {
+router.get("/getstudentregistrationdetails/:adharnumber", isTeacherOrExamHead, adharNumberParams, async function (req, res) {
 let result = await teacherDB.getStudentRegistrationDetails(req.params.adharnumber, JSON.parse(req.user.configdata).session, req.user.accountid);
     if(result.studentData.length>0){
         let freePrintData = {
@@ -590,12 +574,12 @@ let result = await teacherDB.getStudentRegistrationDetails(req.params.adharnumbe
         }
     res.status(200).json({ status: 1, statusDescription: freePrintData});
     } else {
-        res.status(200).json({ status: 0, statusDescription: "Not able tpoo get the data." });
+        res.status(200).json({ status: 0, statusDescription: "Not able to get the data." });
     }
 })
 
 //save attendance student by class teacher
-router.post('/savedailyattendance', async function (req, res) {
+router.post('/savedailyattendance',isTeacherOrExamHead, saveAttendanceObject, async function (req, res) {
     let attendanceObj = [];
     for(let i=0;i<req.body.length;i++){
         attendanceObj.push({
@@ -624,4 +608,443 @@ router.get('/getdailyattendance', async function (req, res) {
         res.status(200).json({ status: 0, statusDescription: "Student is not Reactivated." });
     }
 });
+
+/**
+* @swagger
+* paths:
+*     /teacherservice/studentRegistration:
+*         post:
+*             description: Regisster Student 
+*             tags: [Faculty Service]
+*             summary: "Register Student, only accessed by Teacher"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 firstname:
+*                                     type: string
+*                                 lastname:
+*                                     type: string
+*                                 mothername:
+*                                     type: string
+*                                 fathername:
+*                                     type: string
+*                                 cellnumber:
+*                                     type: string
+*                                 adharnumber:
+*                                     type: string
+*                                 dob:
+*                                     type: string
+*                                 gender:
+*                                     type: number
+*                                 religion:
+*                                     type: number
+*                                 category:
+*                                     type: number
+*                                 locality:
+*                                     type: string
+*                                 parmanentaddress:
+*                                     type: string
+*                                 localaddress:
+*                                     type: string
+*                                 busservice:
+*                                     type: number
+*                                 route: 
+*                                     type: number
+*                                 images:
+*                                     type: string
+*                                 studentid:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /teacherservice/updateStudentDetails/{studentid}:
+*       get:
+*          description: Get Student Details, only access by Class Teacher  
+*          tags: [Faculty Service]
+*          summary: Get Student Details for Edit, only access by Class Teacher  
+*          parameters:
+*              - in: path
+*                name: studentid
+*                required: true
+*                schema:
+*                  type: string
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/getmystudents:
+*      get:
+*          description: Get All Students List Of Class, only access by Class Teacher 
+*          tags: [Faculty Service]
+*          summary: Get Students Details, only access by Class Teacher 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*                                example:
+*                                   userid: ''
+*                                   firstname: ''
+*                                   lastname: ''
+*                                   mothername: ''
+*                                   fathername: ''
+*                                   cellnumber: ''
+*                                   adharnumber: ''
+*                                   dob: ''
+*                                   gender: ''
+*                                   religion: ''
+*                                   category: ''
+*                                   locality: ''
+*                                   parmanentaddress: ''
+*                                   localaddress: ''
+*                                   busservice: ''
+*                                   route: ''
+*                                   images: ''
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/getmyinactivatedstudents:
+*      get:
+*          description: Get Inactivated Students List Of Class, only access by Class Teacher 
+*          tags: [Faculty Service]
+*          summary: Get Inactivated students, only access by Class Teacher 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*                                example:
+*                                   userid: ''
+*                                   firstname: ''
+*                                   lastname: ''
+*                                   mothername: ''
+*                                   fathername: ''
+*                                   cellnumber: ''
+*                                   adharnumber: ''
+*                                   dob: ''
+*                                   gender: ''
+*                                   religion: ''
+*                                   category: ''
+*                                   locality: ''
+*                                   parmanentaddress: ''
+*                                   localaddress: ''
+*                                   busservice: ''
+*                                   route: ''
+*                                   images: ''
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/getAdharnumber/{adharnumber}:
+*       get:
+*          description: Verify the AAdhar Number 
+*          tags: [Faculty Service]
+*          summary: Verify the AAdhar Number  
+*          parameters:
+*              - in: path
+*                name: adharnumber
+*                required: true
+*                schema:
+*                  type: string
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/getEmailId/{emailid}:
+*       get:
+*          description: Verify the emailid 
+*          tags: [Faculty Service]
+*          summary: Verify the emailid  
+*          parameters:
+*              - in: path
+*                name: emailid
+*                required: true
+*                schema:
+*                  type: string
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/assignsubjects:
+*       get:
+*          description: Get Assign Subjects
+*          tags: [Faculty Service]
+*          summary: Get Assign Subjects 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/studentResult:
+*         post:
+*             description: Student Result 
+*             tags: [Faculty Service]
+*             summary: "Craete Student Result, only accessed by Teacher"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 studentid:
+*                                     type: number
+*                                 subjectid:
+*                                     type: number
+*                                 totalMarks:
+*                                     type: number
+*                                 obtainMarks:
+*                                     type: number
+*                                 examinationtype:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /teacherservice/studentAttendance:
+*         post:
+*             description: Student Result 
+*             tags: [Faculty Service]
+*             summary: "Craete Student Result, only accessed by Teacher"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 studentid:
+*                                     type: number
+*                                 monthName:
+*                                     type: number
+*                                 totalClasses:
+*                                     type: number
+*                                 presentClasses:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /teacherservice/getfeedetailsforteacher:
+*       get:
+*          description: Get Fee Details
+*          tags: [Faculty Service]
+*          summary: Get Fee Details for Class Teacher 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/getstudentsresult:
+*      get:
+*          description: Get Student Result, only access by Class Teacher 
+*          tags: [Faculty Service]
+*          summary: Get Students Result, only access by Class Teacher 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/getstudentsattendance:
+*      get:
+*          description: Get Student Attendance, only access by Class Teacher 
+*          tags: [Faculty Service]
+*          summary: Get Students Attendance, only access by Class Teacher 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/getTeacherDetails:
+*      get:
+*          description: Get Student Attendance, only access by Class Teacher 
+*          tags: [Faculty Service]
+*          summary: Get Students Attendance, only access by Class Teacher 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*                                example:
+*                                   firstname: ''
+*                                   lastname: ''
+*                                   emailid: ''
+*                                   dob: ''
+*                                   cellnumber: ''
+*                                   localaddress: ''
+*                                   parmanentaddress: ''
+*                                   qualification: ''
+*                                   classid: ''
+*                                   section: ''
+*                                   images: ''
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/inactivatestudent:
+*         post:
+*             description: Inactivate Student
+*             tags: [Faculty Service]
+*             summary: "Inactivate Student, only accessed by Teacher"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 studentid:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /teacherservice/reactivatestudent:
+*         post:
+*             description: Reactivate Student
+*             tags: [Faculty Service]
+*             summary: "Reactivate Student, only accessed by Teacher"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 studentid:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /teacherservice/getStudentRegistrationDetails/{adharnumber}:
+*      get:
+*          description: Get Student Registration Details, only access by Class Teacher 
+*          tags: [Faculty Service]
+*          summary: Get Student Registration Details, only access by Class Teacher 
+*          parameters:
+*              - in: path
+*                name: adharnumber
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /teacherservice/savedailyattendance:
+*         post:
+*             description: Reactivate Student
+*             tags: [Faculty Service]
+*             summary: "Reactivate Student, only accessed by Teacher"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 accountid:
+*                                     type: string
+*                                 userid:
+*                                     type: number
+*                                 studentId:
+*                                     type: number
+*                                 classid:
+*                                     type: number
+*                                 section:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /teacherservice/getdailyattendance:
+*      get:
+*          description: Get Daily Attendance, only access by Class Teacher 
+*          tags: [Faculty Service]
+*          summary: Get Daily Attendance, only access by Class Teacher 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*/
+
+
 module.exports = router;

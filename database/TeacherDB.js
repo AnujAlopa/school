@@ -2,6 +2,7 @@ var db = require('./db.js');
 
 exports.checkTeacherStudentRelation = async function (studentid, accountid) {
     let studentAccountId = await db.query('select accountid from teacher_principal where userid = (select teacherid from student_teacher where studentid = ?)', [studentid])
+   if(studentAccountId.length>0){
     let result = studentAccountId[0].accountid.localeCompare(accountid);
     if (result === 0) {
         return true
@@ -11,6 +12,9 @@ exports.checkTeacherStudentRelation = async function (studentid, accountid) {
     else {
         return false
     }
+   }else{
+       return false
+   }
 }
 exports.checkAddhar = async function (adharnumber) {
     let result = await db.query('select adharnumber from userdetails where adharnumber = ?', adharnumber);

@@ -1,54 +1,9 @@
-var express = require('express');
-var ProductionWebsiteStaticsFilesRouter = require('./routes/prodStaticFilesRouter.js');
-var webServiceRouter = require("./routes/webserviceRouter.js");
-var path = require('path');
-const swaggerUi = require('swagger-ui-express');
-var swaggerJSDoc = require('swagger-jsdoc');
-var swaggerDefinition = {
-    openapi: "3.0.0",
-    components: {
-        securitySchemes: {
-            MobilePatientSecurity:
-            {
-                type: 'apiKey',
-                name: 'x-access-token',
-                in: 'header'
-            },
-            ProviderSecurity:
-            {
-                type: 'apiKey',
-                name: 'session',
-                in: 'cookie'
-            }
-        }
-    },
-    info: {
-        title: 'Node Swagger API',
-        version: '1.0.0',
-        description: 'Demonstrating how to describe a RESTful API with Swagger',
-    },
-    servers:
-        [{
-            url: '/api',
-            description: 'the api end point'
-        }]
-}
-// options for the swagger docs
-var options = {
-    // import swaggerDefinitions
-    swaggerDefinition: swaggerDefinition,
-    // path to the API docs
-    apis: [__dirname + '/api/ProviderAuthService.js',
-    __dirname + '/api/ProviderService.js',
-    __dirname + '/api/OtpService.js',
-    __dirname + '/api/UserService.js',
-    __dirname + '/adminapi/AccountService.js']// pass all in array
+const express = require('express');
+const ProductionWebsiteStaticsFilesRouter = require('./routes/prodStaticFilesRouter.js');
+const webServiceRouter = require("./routes/webserviceRouter.js");
+const path = require('path');
 
-};
-var swaggerSpec = swaggerJSDoc(options);
-
-
-var errorHandler = function (err, req, res, next) {
+let errorHandler = function (err, req, res, next) {
     console.log(err.stack)
     if (res.headersSent) {
         return next(err);
@@ -58,8 +13,8 @@ var errorHandler = function (err, req, res, next) {
 };
 
 function redirectHttpToHttps(req, res, next) {
-    if ((!req.secure) && req.get('X-Forwarded-Proto') && (req.get('X-Forwarded-Proto') !== 'https')) {
-        res.redirect('https://' + 'svmanuj.com' + req.url);
+    if ((!req.secure) && req.get('X-Forwarded-Proto') && (req.get('X-Forwarded-Proto') !== 'http')) {
+        res.redirect('http://' + 'edusamadhan.com' + req.url);
     }
     else
         next();
@@ -74,7 +29,6 @@ function mountRoutes(app, passport) {
         app.use('*.map', blockDotMapFiles);
     }
     app.use('/api', webServiceRouter(passport));
-    app.use('/apidocs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
     app.use(errorHandler);
 }
 

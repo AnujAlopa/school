@@ -2,6 +2,9 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var router = express.Router();
 var validator = require('express-validator');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('../SwaggerConfig')
+
 var isAuthenticated = function (req, res, next) {
 
     if (req.isAuthenticated()) {
@@ -30,6 +33,7 @@ function configRouter() {
     router.use("/studentfeeservice",isAuthenticated, require("../api/StudentFeeService.js"));
     router.use("/studentservice", require("../api/StudentService.js"));
     router.use("/logbookservice",isAuthenticated, require("../api/LogbookService.js"));
+    router.use('/apidocs',swaggerUi.serve,swaggerUi.setup(swaggerSpec.swagger()));
 
     return router;
 }

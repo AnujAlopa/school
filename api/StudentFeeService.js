@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const studentFeeDB = require("../database/StudentFeeDB.js");
 const UserEnum = require('../lookup/UserEnum');
+const joiSchema = require('../apiJoi/accountant.js');
+const middleWare = require('../apiJoi/middleWare.js');
 
 function isAccountantOrTeacher(req, res, next) {
     if (req.user.role == UserEnum.UserRoles.FeeAccount || req.user.role === UserEnum.UserRoles.Teacher) {
@@ -9,9 +11,23 @@ function isAccountantOrTeacher(req, res, next) {
         return res.status(403).json({ status: 0, statusDescription: "Not Authenticated user." });
     }
 }
+function isTeacher(req, res, next) {
+    if (req.user.role === UserEnum.UserRoles.Teacher) {
+        next();
+    } else {
+        return res.status(403).json({ status: 0, statusDescription: "Not Authenticated user." });
+    }
+}
+function isAccountant(req, res, next) {
+    if (req.user.role == UserEnum.UserRoles.FeeAccount ) {
+        next();
+    } else {
+        return res.status(403).json({ status: 0, statusDescription: "Not Authenticated user." });
+    }
+}
 
 async function isStudentBelongsToSameSchool(req, res, next) {
-    let result = await studentFeeDB.checkStudentSchool(req.user.accountid,  req.params.adharnumber)
+    let result = await studentFeeDB.checkStudentSchool(req.user.accountid,  (req.params.adharnumber || req.body.adharnumber))
     if (result === 1) {
         next();
     } else if(result === 2) {
@@ -23,12 +39,23 @@ async function isStudentBelongsToSameSchool(req, res, next) {
 
 async function isClassBelongsToSameSchool(req, res, next) {
     let result = await studentFeeDB.checkClassSchool(req.user.accountid, req.params.classid, req.params.sectionid, UserEnum.UserRoles.Teacher, JSON.parse(req.user.configdata).session)
+   console.log('result',result)
     if (result) {
         next();
     } else {
         return res.status(200).json({ status: 2, statusDescription: "AAdhar number is not belongs to your school. Try with correct aadhar number." });
     }
 }
+
+const classIdParams =  middleWare(joiSchema.classIdParams, "params", true);
+const classFeeObject = middleWare(joiSchema.classFeeObject, "body", true);
+const adharNumberParams =  middleWare(joiSchema.adharNumberParams, "params", true);
+const adharAndMonthParams =  middleWare(joiSchema.adharAndMonthParams, "params", true);
+const monthFeeObject =  middleWare(joiSchema.monthFeeObject, "body", true);
+const classIdAndSectionParams =  middleWare(joiSchema.classIdAndSectionParams, "params", true);
+const transportFeeObject =  middleWare(joiSchema.transportFeeObject, "body", true);
+const transportIDParams =  middleWare(joiSchema.transportIDParams, "params", true);
+const expensedetailsidParams =  middleWare(joiSchema.expensedetailsidParams, "params", true);
 
 //get fee details
 router.get("/getfeedetails", isAccountantOrTeacher, async function (req, res) {
@@ -58,7 +85,7 @@ router.get("/getfeedetails", isAccountantOrTeacher, async function (req, res) {
     }
 })
 //get fee details by class
-router.get("/:classs/getfeedetailbyclass", isAccountantOrTeacher, async function (req, res) {
+router.get("/getfeedetailbyclass/:classs", isAccountantOrTeacher, classIdParams, async function (req, res) {
     let result = await studentFeeDB.getFeeDetailByClass(JSON.parse(req.user.configdata).session, req.user.accountid, req.params.classs);
     if (result.length > 0) {
         var resultObj = []
@@ -85,7 +112,7 @@ router.get("/:classs/getfeedetailbyclass", isAccountantOrTeacher, async function
     }
 })
 //create fee for selected class
-router.post("/createfeeforselectedclass", isAccountantOrTeacher, async function (req, res) {
+router.post("/createfeeforselectedclass", isAccountant, classFeeObject, async function (req, res) {
     feeObject = {
         class: req.body.class,
         january: req.body.january,
@@ -109,7 +136,7 @@ router.post("/createfeeforselectedclass", isAccountantOrTeacher, async function 
     }
 })
 //update Student fee details
-router.put("/updatefeedetails", isAccountantOrTeacher, async function (req, res) {
+router.put("/updatefeedetails", isAccountant, classFeeObject, async function (req, res) {
     feeObject = {
         class: req.body.class,
         january: req.body.january,
@@ -133,7 +160,7 @@ router.put("/updatefeedetails", isAccountantOrTeacher, async function (req, res)
     }
 })
 //get Student fee details
-router.get("/:adharnumber/feedetails", isAccountantOrTeacher, isStudentBelongsToSameSchool, async function (req, res) {
+router.get("/feedetails/:adharnumber", isAccountant, adharNumberParams, isStudentBelongsToSameSchool, async function (req, res) {
     let result = await studentFeeDB.getStudentFeeDetails(req.params.adharnumber, JSON.parse(req.user.configdata).session, req.user.accountid, UserEnum.UserRoles.Student);
     if (result.student.length > 0) {
         var s = result.student[0];
@@ -190,7 +217,7 @@ router.get("/:adharnumber/feedetails", isAccountantOrTeacher, isStudentBelongsTo
     }
 })
 //get monthly fee based on selected month
-router.get("/:adharnumber/:selectedmonth/getmonthlyfee", isAccountantOrTeacher, isStudentBelongsToSameSchool, async function (req, res) {
+router.get("/getmonthlyfee/:adharnumber/:selectedmonth", isAccountant, adharAndMonthParams, isStudentBelongsToSameSchool, async function (req, res) {
     let result = await studentFeeDB.getMonthlyFeeBasedOnSelectedMonth(req.params.adharnumber, JSON.parse(req.user.configdata).session, req.user.accountid, req.params.selectedmonth);
     if (result.length > 0) {
         res.status(200).json({ status: 1, statusDescription: result });
@@ -199,20 +226,21 @@ router.get("/:adharnumber/:selectedmonth/getmonthlyfee", isAccountantOrTeacher, 
     }
 })
 //pay student fee
-router.post("/:adharnumber/paystudentfee", isAccountantOrTeacher, isStudentBelongsToSameSchool, async function (req, res) {
+router.post("/paystudentfee", isAccountant, monthFeeObject, isStudentBelongsToSameSchool, async function (req, res) {
     let studentFeeObj = {
         monthName: req.body.monthName,
         selectedmonthfee: req.body.selectedmonthfee
     }
-    let result = await studentFeeDB.payStudentFee(req.params.adharnumber, JSON.parse(req.user.configdata).session, studentFeeObj, req.body.feeObject);
+    let result = await studentFeeDB.payStudentFee(req.body.adharnumber, JSON.parse(req.user.configdata).session, studentFeeObj);
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: "Student fee has been submitted successfully." });
     } else {
         res.status(200).json({ status: 0, statusDescription: "Not able to submit the fee." });
     }
 })
+
 //get fee details by class
-router.get("/:classid/:sectionid/getclassfeedetails", isAccountantOrTeacher, isClassBelongsToSameSchool, async function (req, res) {
+router.get("/getclassfeedetails/:classid/:sectionid", isTeacher, classIdAndSectionParams, async function (req, res) {
     let result = await studentFeeDB.getclassfeedetails(JSON.parse(req.user.configdata).session, req.user.accountid, req.params.classid, req.params.sectionid);
     if (result.feeDetails.length > 0) {
         let resultObj = [];
@@ -247,7 +275,7 @@ router.get("/:classid/:sectionid/getclassfeedetails", isAccountantOrTeacher, isC
 })
 
 //get student fee print details
-router.get("/:adharnumber/getfeeprintdetails", isAccountantOrTeacher, isStudentBelongsToSameSchool, async function (req, res) {
+router.get("/getfeeprintdetails/:adharnumber", isAccountantOrTeacher, adharNumberParams, isStudentBelongsToSameSchool, async function (req, res) {
     let result = await studentFeeDB.getFeeDetailsForPrint(req.params.adharnumber, JSON.parse(req.user.configdata).session, req.user.accountid);
     if (result.studentData.length > 0) {
         let freePrintData = {
@@ -269,9 +297,9 @@ router.get("/:adharnumber/getfeeprintdetails", isAccountantOrTeacher, isStudentB
     }
 })
 
-//get students list of class
-router.get("/getstudentslist/:classid/:section", async function (req, res) {
-    let result = await studentFeeDB.getStudentsListOfClass(req.user.accountid, req.user.userid, req.params.classid, req.params.section, JSON.parse(req.user.configdata).session);
+//get Full Class Fee Details of class
+router.get("/getstudentslist/:classid/:sectionid", classIdAndSectionParams, async function (req, res) {
+    let result = await studentFeeDB.getStudentsListOfClass(req.user.accountid, req.user.userid, req.params.classid, req.params.sectionid, JSON.parse(req.user.configdata).session);
     if (result.length > 0) {
         var resultObj = [];
         result.forEach(function (row) {
@@ -303,8 +331,8 @@ router.get("/getstudentslist/:classid/:section", async function (req, res) {
 })
 
 //get Student fee details 
-router.get("/getfullfeedetails/:classid/:section", async function (req, res) {
-    let result = await studentFeeDB.getFullFeeDetails(req.user.accountid, req.params.classid, req.params.section, JSON.parse(req.user.configdata).session);
+router.get("/getfullfeedetails/:classid/:sectionid", classIdAndSectionParams, async function (req, res) {
+    let result = await studentFeeDB.getFullFeeDetails(req.user.accountid, req.params.classid, req.params.sectionid, JSON.parse(req.user.configdata).session);
     if (result) {
         var resultObj = [];
         var a = result.feeStructure[0];
@@ -349,7 +377,7 @@ router.get("/getfullfeedetails/:classid/:section", async function (req, res) {
 })
 
 //create transport fee
-router.post("/createtransportfee", isAccountantOrTeacher, async function (req, res) {
+router.post("/createtransportfee", isAccountant, transportFeeObject, async function (req, res) {
     let transportFeeObj = {
         accountid: req.user.accountid,
         userid: req.user.userid,
@@ -398,7 +426,7 @@ router.get("/gettransportfee", isAccountantOrTeacher, async function (req, res) 
 })
 
 //delete transport fee
-router.delete("/deletetransportfee/:transportfeeid", isAccountantOrTeacher, async function (req, res) {
+router.delete("/deletetransportfee/:transportfeeid", isAccountant, transportIDParams, async function (req, res) {
     let result = await studentFeeDB.deleteTranssportFee(req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.transportfeeid);
     if (result === 1) {
         res.status(200).json({ status: 1, statusDescription: "Transport fee has been deleted successfully."});
@@ -408,7 +436,7 @@ router.delete("/deletetransportfee/:transportfeeid", isAccountantOrTeacher, asyn
 })
 
 //get transport fee
-router.get("/gettetransportfee/:transportfeeid", isAccountantOrTeacher, async function (req, res) {
+router.get("/gettetransportfee/:transportfeeid", isAccountantOrTeacher, transportIDParams, async function (req, res) {
     let result = await studentFeeDB.getTranssportFeeById(req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.transportfeeid);
     if (result.length) {
         let resultObj = [];
@@ -433,7 +461,7 @@ router.get("/gettetransportfee/:transportfeeid", isAccountantOrTeacher, async fu
 })
 
 //update transport fee
-router.put("/updatetransportfee/:transportfeeid", isAccountantOrTeacher, async function (req, res) {
+router.put("/updatetransportfee/:transportfeeid", isAccountant, async function (req, res) {
     let feeObj = {
         route: encrypt.encrypt(req.body.route),
         fee: req.body.fee,
@@ -455,7 +483,7 @@ router.put("/updatetransportfee/:transportfeeid", isAccountantOrTeacher, async f
 })
 
 //create expense
-router.post("/createexpense", isAccountantOrTeacher, async function (req, res) {
+router.post("/createexpense", isAccountant, async function (req, res) {
     let transportFeeObj = {
         accountid: req.user.accountid,
         userid: req.user.userid,
@@ -492,7 +520,7 @@ router.get("/getexpense", isAccountantOrTeacher, async function (req, res) {
 })
 
 //delete expense
-router.delete("/deleteexpense/:expensedetailsid", isAccountantOrTeacher, async function (req, res) {
+router.delete("/deleteexpense/:expensedetailsid", isAccountant, expensedetailsidParams, async function (req, res) {
     let result = await studentFeeDB.deleteExpense(req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.expensedetailsid);
     if (result === 1) {
         res.status(200).json({ status: 1, statusDescription: "Expense has been deleted successfully."});
@@ -502,7 +530,7 @@ router.delete("/deleteexpense/:expensedetailsid", isAccountantOrTeacher, async f
 })
 
 //get transport fee
-router.get("/getentrance/:expensedetailsid", isAccountantOrTeacher, async function (req, res) {
+router.get("/getentrance/:expensedetailsid", isAccountantOrTeacher, expensedetailsidParams, async function (req, res) {
     let result = await studentFeeDB.getExpenxeById(req.user.accountid, JSON.parse(req.user.configdata).session, req.user.userid, req.params.expensedetailsid);
     if (result.length) {
         let resultObj = [];
@@ -521,7 +549,7 @@ router.get("/getentrance/:expensedetailsid", isAccountantOrTeacher, async functi
 })
 
 //update Expense
-router.put("/expense/:expensedetailsid", isAccountantOrTeacher, async function (req, res) {
+router.put("/expense/:expensedetailsid", isAccountant, async function (req, res) {
     let feeObj = {
         accountid: req.user.accountid,
         userid: req.user.userid,
@@ -570,4 +598,540 @@ router.get("/getstudenttransportfee/:adharnumber", async function (req, res) {
         res.status(200).json({ status: 0, statusDescription: "Not able to get the fee." });
     }
 })
+
+/**
+* @swagger
+* paths:
+*     /studentfeeservice/getfeedetails:
+*      get:
+*          description: Get Fee Details, only access by Accountant 
+*          tags: [Accountant Service]
+*          summary: Get Fee Details, only access by Accountant 
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*                                example:
+*                                   class: ''
+*                                   january: ''
+*                                   february: ''
+*                                   march: ''
+*                                   april: ''
+*                                   may: ''
+*                                   june: ''
+*                                   july: ''
+*                                   august: ''
+*                                   september: ''
+*                                   october: ''
+*                                   november: ''
+*                                   december: ''
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getfeedetailbyclass/{classs}:
+*       get:
+*          description: Get Class Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Class Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: classs
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*                                example:
+*                                   class: ''
+*                                   january: ''
+*                                   february: ''
+*                                   march: ''
+*                                   april: ''
+*                                   may: ''
+*                                   june: ''
+*                                   july: ''
+*                                   august: ''
+*                                   september: ''
+*                                   october: ''
+*                                   november: ''
+*                                   december: ''
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/createfeeforselectedclass:
+*         post:
+*             description: Save Fee Details 
+*             tags: [Accountant Service]
+*             summary: "Save Fee Details of a class, only accessed by Accountant"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 class:
+*                                     type: number
+*                                 january:
+*                                     type: number
+*                                 february:
+*                                     type: number
+*                                 march:
+*                                     type: number
+*                                 april:
+*                                     type: number
+*                                 may:
+*                                     type: number
+*                                 june:
+*                                     type: number
+*                                 july:
+*                                     type: number
+*                                 august:
+*                                     type: number
+*                                 september:
+*                                     type: number
+*                                 october:
+*                                     type: number
+*                                 november:
+*                                     type: number
+*                                 december:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /studentfeeservice/updatefeedetails:
+*         put:
+*             description: Update Fee Details 
+*             tags: [Accountant Service]
+*             summary: "Update Fee Details of a class, only accessed by Accountant"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 class:
+*                                     type: number
+*                                 january:
+*                                     type: number
+*                                 february:
+*                                     type: number
+*                                 march:
+*                                     type: number
+*                                 april:
+*                                     type: number
+*                                 may:
+*                                     type: number
+*                                 june:
+*                                     type: number
+*                                 july:
+*                                     type: number
+*                                 august:
+*                                     type: number
+*                                 september:
+*                                     type: number
+*                                 october:
+*                                     type: number
+*                                 november:
+*                                     type: number
+*                                 december:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /studentfeeservice/feedetails/{adharnumber}:
+*       get:
+*          description: Get Student Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Student Fee Details by AAdhar Number, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: adharnumber
+*                required: true
+*                schema:
+*                  type: string
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getmonthlyfee/{adharnumber}/{selectedmonth}:
+*       get:
+*          description: Get Student Monthly Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Student Monthly Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: adharnumber
+*                required: true
+*                schema:
+*                  type: string
+*              - in: path
+*                name: selectedmonth
+*                required: true
+*                schema:
+*                  type: string
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/paystudentfee:
+*         post:
+*             description: Pay Student Fee
+*             tags: [Accountant Service]
+*             summary: Pay student fee, only accessed by Accountant
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 adharnumber:
+*                                     type: string
+*                                 selectedmonthfee:
+*                                     type: number
+*                                 monthName:
+*                                     type: string
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getclassfeedetails/{classid}/{sectionid}:
+*       get:
+*          description: Get Class Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Class Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: classid
+*                required: true
+*                schema:
+*                  type: number
+*              - in: path
+*                name: sectionid
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getfeeprintdetails/{adharnumber}:
+*       get:
+*          description: Get Student Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Student Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: adharnumber
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getstudentslist/{classid}/{sectionid}:
+*       get:
+*          description: Get Students List, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Student Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: classid
+*                required: true
+*                schema:
+*                  type: number
+*              - in: path
+*                name: sectionid
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getfullfeedetails/{classid}/{sectionid}:
+*       get:
+*          description: Get Full Class Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Full Class Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: classid
+*                required: true
+*                schema:
+*                  type: number
+*              - in: path
+*                name: sectionid
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/createtransportfee:
+*         post:
+*             description: Create Transport Fee Detailas 
+*             tags: [Accountant Service]
+*             summary: "Create Transport Fee Detailas, only accessed by Accountant"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 route:
+*                                     type: string
+*                                 fee:
+*                                     type: number
+*                                 vehiclenumber:
+*                                     type: string
+*                                 drivername:
+*                                     type: string
+*                                 drivernumber:
+*                                     type: string
+*                                 driversalary:
+*                                     type: number
+*                                 vehicletype:
+*                                     type: number
+*                                 vehiclecolor:
+*                                     type: string
+*                                 vehicleexpense:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /studentfeeservice/gettransportfee:
+*       get:
+*          description: Get Transport Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Transport Fee Details, only access by Accountant  
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/deletetransportfee/{transportfeeid}:
+*       delete:
+*          description: Delete Transport Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Transport Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: transportfeeid
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/gettetransportfee/{transportfeeid}:
+*       get:
+*          description: Get Transport Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Transport Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: transportfeeid
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/createexpense:
+*         post:
+*             description: Create Expense Fee Detailas 
+*             tags: [Accountant Service]
+*             summary: "Create Expense Fee Detailas, only accessed by Accountant"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 expense:
+*                                     type: string
+*                                 expenseamount:
+*                                     type: number
+*                                 expensedate:
+*                                     type: string
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getexpense:
+*       get:
+*          description: Get Expense Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Expense Details, only access by Accountant  
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/deleteexpense/{expensedetailsid}:
+*       delete:
+*          description: Delete Transport Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Transport Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: expensedetailsid
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/gettetransportfee/{expensedetailsid}:
+*       get:
+*          description: Get Transport Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Transport Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: expensedetailsid
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getstaffsalary:
+*       get:
+*          description: Get Staff Salary, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Staff Salary, only access by Accountant  
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /studentfeeservice/getstudenttransportfee/{adharnumber}:
+*       get:
+*          description: Get Student Transport Fee Details, only access by Accountant  
+*          tags: [Accountant Service]
+*          summary: Get Student Transport Fee Details, only access by Accountant  
+*          parameters:
+*              - in: path
+*                name: adharnumber
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*/
 module.exports = router;

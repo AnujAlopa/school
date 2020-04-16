@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const entranceExamDB = require("../database/EntranceExamDB.js");
 const UserEnum = require('../lookup/UserEnum');
-const joiSchema = require('../apiJoi/examJoi.js');
+const joiSchema = require('../apiJoi/examination.js');
 const middleWare = require('../apiJoi/middleWare.js');
 
 function isExaminationHead(req, res, next) {
@@ -34,10 +34,19 @@ let checkTeacherBelongsToAccount = function (req, res, next) {
             res.status(400).json({ status: 0, statusDescription: "Not Authenticated user." });
         })
 }
+const classIdParams = middleWare(joiSchema.classIdParams, "params", true);
+const studentIdParams = middleWare(joiSchema.studentIdParams, "params", true);
+const studentIdClassIdSectionIdParams = middleWare(joiSchema.studentIdClassIdSectionIdParams, "params", true);
+const questionIdParams = middleWare(joiSchema.questionIdParams, "params", true);
+const entranceObject = middleWare(joiSchema.entranceObject, "body", true);
+const studentIdBody = middleWare(joiSchema.studentIdBody, "body", true);
+const questionObject = middleWare(joiSchema.questionObject, "body", true);
+const resultObject = middleWare(joiSchema.resultObject, "body", true);
+
 
 //get students for Exam head
-router.get("/:classid/entrancestudents", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let students = await entranceExamDB.getStudentsForExamhead(req.user.userid, req.params.classid);
+router.get("/entrancestudents/:classId", isExaminationHead, classIdParams, checkTeacherBelongsToAccount, async function (req, res) {
+    let students = await entranceExamDB.getStudentsForExamhead(req.user.userid, req.params.classId);
     if (students.length > 0) {
         let studentsObj = [];
         students.forEach(function (row) {
@@ -53,35 +62,38 @@ router.get("/:classid/entrancestudents", isExaminationHead, checkTeacherBelongsT
                 status: row.status,
                 class: row.classid,
                 userrole: row.userrole,
-                section:row.section
+                section: row.section
             });
         });
         res.status(200).json({ status: 1, students: studentsObj });
     } else {
-        res.status(200).json({ status: 0, statusDescription:"Students are not Registered." });
+        res.status(200).json({ status: 0, statusDescription: "Students are not Registered." });
     }
 });
+
 //delete student by Exam Head
-router.delete("/:studentid/deletestudent", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let result = await entranceExamDB.deleteStudent(req.params.studentid, req.user.userid);
+router.delete("/deletestudent/:studentId", isExaminationHead, studentIdParams, checkTeacherBelongsToAccount, async function (req, res) {
+    let result = await entranceExamDB.deleteStudent(req.params.studentId, req.user.userid);
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: 'Student has been deleted successfully.' });
     } else {
         res.status(200).json({ status: 0, statusDescription: 'Student has not been deleted.' })
     }
 });
+
 //pramote students by Exam Head
-router.put("/:studentid/:classid/:section/pramotestudent", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let result = await entranceExamDB.pramoteStudent(req.user.userid, req.params.studentid, req.params.classid,JSON.parse(req.user.configdata).session, req.user.accountid, req.params.section);
+router.put("/pramotestudent/:studentId/:classId/:sectionId", isExaminationHead, studentIdClassIdSectionIdParams, checkTeacherBelongsToAccount, async function (req, res) {
+    let result = await entranceExamDB.pramoteStudent(req.user.userid, req.params.studentId, req.params.classId, JSON.parse(req.user.configdata).session, req.user.accountid, req.params.sectionId);
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: 'Student has been Promoted successfully.' });
     } else {
         res.status(200).json({ status: 0, statusDescription: 'Student has not been Promoted.' });
     }
 });
+
 //get entrance question based on selected class by Exam Head
-router.get("/:classid/getclassforquestion", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let result = await entranceExamDB.getClassForEntrance(req.user.accountid, req.params.classid);
+router.get("/getclassforquestion/:classId", isExaminationHead, classIdParams, checkTeacherBelongsToAccount, async function (req, res) {
+    let result = await entranceExamDB.getClassForEntrance(req.user.accountid, req.params.classId);
     if (result.length > 0) {
         var resultObj = []
         result.forEach(function (row) {
@@ -102,17 +114,9 @@ router.get("/:classid/getclassforquestion", isExaminationHead, checkTeacherBelon
         res.status(200).json({ status: 0, statusDescription: 'Not able to get the question.' });
     }
 })
-//Delete question by Exam Head
-router.delete("/:questionid/deletequestion", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let result = await entranceExamDB.deleteEntranceQuestion(req.params.questionid, req.user.accountid);
-    if (result == 1) {
-        res.status(200).json({ status: 1, statusDescription: 'Question has been deleted successfully.' });
-    } else {
-        res.status(200).json({ status: 0, statusDescription: 'Not able to delete the question.' });
-    }
-});
+
 //entrance Registration
-router.post("/entranceRegistration", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
+router.post("/entranceRegistration", isExaminationHead, entranceObject, checkTeacherBelongsToAccount, async function (req, res) {
     let student = {
         fname: encrypt.encrypt(req.body.fname),
         lname: encrypt.encrypt(req.body.lname),
@@ -126,15 +130,20 @@ router.post("/entranceRegistration", isExaminationHead, checkTeacherBelongsToAcc
         status: UserEnum.UserStatus.Active,
         userrole: UserEnum.UserRoles.EntranceStudent
     }
-    let result = await entranceExamDB.saveStusentEntrance(student, req.user.userid);
+    let result
+    if (req.body.studentId) {
+        result = await entranceExamDB.updateEntranceStudent(studentObject, req.body.studentId, req.user.userid);
+    } else {
+        result = await entranceExamDB.saveStusentEntrance(student, req.user.userid);
+    }
     if (result) {
-        res.status(200).json({ status: 1, statusDescription: 'Student has been registered successfully.' })
+        res.status(200).json({ status: 1, statusDescription: req.body.studentId ? 'Student record has been updated successfully.' : 'Student has been registered successfully.' })
     } else {
         res.status(400).json({ status: 0, statusDescription: 'Student registration not completed.' })
     }
 });
 //get student for update for edit
-router.get("/:studentId/getstudentforedit", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
+router.get("/getstudentforedit/:studentId", isExaminationHead, studentIdParams, checkTeacherBelongsToAccount, async function (req, res) {
     let result = await entranceExamDB.getStudentForEdit(req.user.userid, req.params.studentId);
     if (result.length > 0) {
         var resultObj = []
@@ -154,28 +163,9 @@ router.get("/:studentId/getstudentforedit", isExaminationHead, checkTeacherBelon
         res.status(200).json({ status: 0, statusDescription: 'Not able to fetch the data.' });
     }
 })
-// Updating student
-router.put("/updateEntranceRegistration", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let studentObject = {
-        firstname: encrypt.encrypt(req.body.fname),
-        lastname: encrypt.encrypt(req.body.lname),
-        cellnumber: encrypt.encrypt(req.body.cellnumber),
-        username: encrypt.computeHash(req.body.adharnumber),
-        adharnumber: req.body.adharnumber,
-        dob: encrypt.encrypt(req.body.dob),
-        classid: req.body.class,
-        section: req.body.section
-    }
-    let result = await entranceExamDB.updateEntranceStudent(studentObject, req.body.studentId, req.user.userid);
-    if (result) {
-        res.status(200).json({ status: 1, statusDescription: 'Student record has been updated successfully.' });
-    } else {
-        res.status(200).json({ status: 0, statusDescription: 'Student record has not been updated.' });
-    }
-});
 
 //update re exam entrance
-router.put("/reexamentrance", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
+router.put("/reexamentrance", isExaminationHead, studentIdBody, checkTeacherBelongsToAccount, async function (req, res) {
     let result = await entranceExamDB.updateEntranceUserrole(req.body.studentid, UserEnum.UserRoles.EntranceStudent, req.user.userid);
     if (result) {
         res.status(200).json({ status: 1, statusDescription: 'Student status updated successfully.' });
@@ -183,9 +173,38 @@ router.put("/reexamentrance", isExaminationHead, checkTeacherBelongsToAccount, a
         res.status(200).json({ status: 0, statusDescription: 'Student status not updated.' });
     }
 });
+
+//Create Entrance Questions
+router.post("/entranceQuestion", isExaminationHead, questionObject, checkTeacherBelongsToAccount, async function (req, res) {
+    let questionObject = {
+        question: encrypt.encrypt(req.body.question),
+        optiona: encrypt.encrypt(req.body.optiona),
+        optionb: encrypt.encrypt(req.body.optionb),
+        optionc: encrypt.encrypt(req.body.optionc),
+        optiond: encrypt.encrypt(req.body.optiond),
+        optione: encrypt.encrypt(req.body.optione),
+        answer: req.body.answer,
+        class: req.body.class,
+        subject: req.body.subject,
+        accountid: req.user.accountid
+    }
+    let result
+    if (req.body.questionId) {
+        questionObject.questionid = req.body.questionId;
+        result = await entranceExamDB.updateEntranceQuestion(questionObject);
+    } else {
+        result = await entranceExamDB.saveEntranceQuestion(questionObject);
+    }
+    if (result) {
+        res.status(200).json({ status: 1, statusDescription: req.body.questionId? 'Question has been updated successfully.': 'Quastion has been created successfully.' });
+    } else {
+        res.status(200).json({ status: 0, statusDescription: 'Quastion not created.' });
+    }
+});
+
 //get question for edit
-router.get("/:questionid/getquestionforedit", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let result = await entranceExamDB.getQuestionForEdit(req.user.accountid, req.params.questionid);
+router.get("/getquestionforedit/:questionId", isExaminationHead, questionIdParams, checkTeacherBelongsToAccount, async function (req, res) {
+    let result = await entranceExamDB.getQuestionForEdit(req.user.accountid, req.params.questionId);
     if (result.length > 0) {
         var resultObj = []
         result.forEach(function (row) {
@@ -208,53 +227,20 @@ router.get("/:questionid/getquestionforedit", isExaminationHead, checkTeacherBel
         res.status(200).json({ status: 0, statusDescription: 'Not able to fetch the data.' });
     }
 })
-// Updating question
-router.put("/:questionid/updatequestion", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let question = {
-        question: encrypt.encrypt(req.body.question),
-        optiona: encrypt.encrypt(req.body.optiona),
-        optionb: encrypt.encrypt(req.body.optionb),
-        optionc: encrypt.encrypt(req.body.optionc),
-        optiond: encrypt.encrypt(req.body.optiond),
-        optione: encrypt.encrypt('None of These'),
-        answer: req.body.answer,
-        class: req.body.class,
-        subject: req.body.subject,
-        accountid: req.user.accountid,
-        questionid: req.params.questionid
-    }
-    let result = await entranceExamDB.updateEntranceQuestion(question);
-    if (result) {
-        res.status(200).json({ status: 1, statusDescription: 'Question has been updated successfully.' });
+
+//Delete question by Exam Head
+router.delete("/deletequestion/:questionId", isExaminationHead, questionIdParams, checkTeacherBelongsToAccount, async function (req, res) {
+    let result = await entranceExamDB.deleteEntranceQuestion(req.params.questionId, req.user.accountid);
+    if (result == 1) {
+        res.status(200).json({ status: 1, statusDescription: 'Question has been deleted successfully.' });
     } else {
-        res.status(200).json({ status: 0, statusDescription: 'Question has not been updated.' });
-    }
-});
-//Create Entrance Questions
-router.post("/entranceQuestion", isExaminationHead, checkTeacherBelongsToAccount, async function (req, res) {
-    let questionObject = {
-        question: encrypt.encrypt(req.body.question),
-        optiona: encrypt.encrypt(req.body.optiona),
-        optionb: encrypt.encrypt(req.body.optionb),
-        optionc: encrypt.encrypt(req.body.optionc),
-        optiond: encrypt.encrypt(req.body.optiond),
-        optione: encrypt.encrypt(req.body.optione),
-        answer: req.body.answer,
-        class: req.body.class,
-        subject: req.body.subject,
-        accountid: req.user.accountid
-    }
-    let result = await entranceExamDB.saveEntranceQuestion(questionObject);
-    if (result) {
-        res.status(200).json({ status: 1, statusDescription: 'Quastion has been created successfully.' });
-    } else {
-        res.status(200).json({ status: 0, statusDescription: 'Quastion not created.' });
+        res.status(200).json({ status: 0, statusDescription: 'Not able to delete the question.' });
     }
 });
 
 //get entrance question for student
 router.get("/getclassforquestion", isExaminationStudent, async function (req, res) {
-    var result = await entranceExamDB.getQuestionForEntrance(req.user.userid,req.user.accountid);
+    var result = await entranceExamDB.getQuestionForEntrance(req.user.userid, req.user.accountid);
     if (result.length > 0) {
         var resultObj = []
         result.forEach(function (row) {
@@ -277,7 +263,7 @@ router.get("/getclassforquestion", isExaminationStudent, async function (req, re
 })
 
 //Insert entrance result
-router.post("/createentranceresult", isExaminationStudent, async function (req, res) {
+router.post("/createentranceresult", isExaminationStudent, resultObject, async function (req, res) {
     var result = {
         studentid: req.user.userid,
         totalmarks: req.body.totalmarks,
@@ -300,7 +286,346 @@ router.get("/getentranceresult", isExaminationCompleted, async function (req, re
         res.status(200).json({ status: 1, statusDescription: result[0] });
     } else {
         res.status(200).json({ status: 0, statusDescription: 'Not able to fetch the data.' });
-    }   
+    }
 })
 
+/**
+* @swagger
+* paths:
+*     /entranceexamservice/entrancestudents/{classId}:
+*      get:
+*          description: Get Entrance Result
+*          tags: [Examination Service]
+*          summary: Get Entrance Result, Only accessed by Examination Head 
+*          parameters:
+*              - in: path
+*                name: classId
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/deletestudent/{studentId}:
+*      delete:
+*          description: Delete the student
+*          tags: [Examination Service]
+*          summary: Delete the student, Only accessed by Examination Head 
+*          parameters:
+*              - in: path
+*                name: studentId
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/pramotestudent/{studentId}/{classId}/{sectionId}:
+*      put:
+*          description: Pramote the student
+*          tags: [Examination Service]
+*          summary: Pramote the student, Only accessed by Examination Head 
+*          parameters:
+*              - in: path
+*                name: studentId
+*                required: true
+*                schema:
+*                  type: number
+*              - in: path
+*                name: classId
+*                required: true
+*                schema:
+*                  type: number
+*              - in: path
+*                name: sectionId
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/getclassforquestion/{classId}:
+*      get:
+*          description: Get Questions based on class
+*          tags: [Examination Service]
+*          summary: Get Questions based on class, Only accessed by Examination Head 
+*          parameters:
+*              - in: path
+*                name: classId
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/entranceRegistration:
+*         post:
+*             description: Entrance Registration
+*             tags: [Examination Service]
+*             summary: "Student Registration, only accessed by Examination Head"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 fname:
+*                                     type: string
+*                                 lname:
+*                                     type: string
+*                                 cellnumber:
+*                                     type: string
+*                                 adharnumber:
+*                                     type: string
+*                                 dob:
+*                                     type: string
+*                                 class:
+*                                     type: string
+*                                 section:
+*                                     type: string
+*                                 studentId:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /entranceexamservice/getstudentforedit/{studentId}:
+*      get:
+*          description: Get Student Detail for edit
+*          tags: [Examination Service]
+*          summary: Get Student Detail for edit, Only accessed by Examination Head 
+*          parameters:
+*              - in: path
+*                name: studentId
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/reexamentrance:
+*         put:
+*             description: Allow for Re-Examination
+*             tags: [Examination Service]
+*             summary: "Allow for Re-Examination, only accessed by Examination Head"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 studentid:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /entranceexamservice/entranceQuestion:
+*         post:
+*             description: Entrance Registration
+*             tags: [Examination Service]
+*             summary: "Student Registration, only accessed by Examination Head"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 question:
+*                                     type: string
+*                                 optiona:
+*                                     type: string
+*                                 optionb:
+*                                     type: string
+*                                 optionc:
+*                                     type: string
+*                                 optiond:
+*                                     type: string
+*                                 optione:
+*                                     type: string
+*                                 answer:
+*                                     type: string
+*                                 class:
+*                                     type: number
+*                                 subject:
+*                                     type: number
+*                                 questionId:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /entranceexamservice/getquestionforedit/{questionId}:
+*      get:
+*          description: Get Question Detail for edit
+*          tags: [Examination Service]
+*          summary: Get Question Detail for edit, Only accessed by Examination Head 
+*          parameters:
+*              - in: path
+*                name: questionId
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/deletequestion/{questionId}:
+*      delete:
+*          description: Delete the question
+*          tags: [Examination Service]
+*          summary: Delete the question, Only accessed by Examination Head 
+*          parameters:
+*              - in: path
+*                name: questionId
+*                required: true
+*                schema:
+*                  type: number
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/getclassforquestion:
+*      get:
+*          description: Get questions for Student
+*          tags: [Examination Service]
+*          summary: Get questions for Student
+*          parameters:
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/createentranceresult:
+*         post:
+*             description: Create Entrance Result
+*             tags: [Examination Service]
+*             summary: "Create Entrance Result, only accessed by Examination Head"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 totalmarks:
+*                                     type: number
+*                                 obtainedmarks:
+*                                     type: number
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*     /entranceexamservice/getentranceresult:
+*      get:
+*          description: Get entrance result
+*          tags: [Examination Service]
+*          summary: Get entrance result
+*          parameters:
+*          responses:
+*                200:
+*                   description: success
+*                   content:
+*                        application/json:
+*                            schema:
+*                                type: object
+*          security:
+*                - LoginSecurity: []
+*     /entranceexamservice/updateProfileDetails:
+*         post:
+*             description: Update Profile of Student
+*             tags: [Examination Service]
+*             summary: "Update Profile of Student, only accessed by Examination Head"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 changePassword:
+*                                     type: boolean
+*                                 oldPassword:
+*                                     type: string
+*                                 newPassword:
+*                                     type: string
+*                                 image:
+*                                     type: string
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*             security:
+*                - LoginSecurity: []
+*/
 module.exports = router;

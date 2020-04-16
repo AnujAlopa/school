@@ -36,19 +36,19 @@ exports.getAttendancesForStudent = async function (teacherid, studentid, session
     return results[0];
 }
 //get Student Result for Student
-exports.getStudentResultForStudent = async function (teacherid, studentid) {
-    return db.transaction(async function (conn) {
-    let result = await db.setQuery(conn, 'select * from config where configid = (select configid from account where accountid = (select accountid from teacher_principal where userid = ?))', [teacherid]);
-    let session = JSON.parse(result[0].configdata).session.value;
-    var results = await db.setQuery(conn, 'CALL SQSP_GetResults(?,?,?)', [teacherid, studentid, session]);
-    return results[0];
-    })
-}
+// exports.getStudentResultForStudent = async function (teacherid, studentid) {
+//     return db.transaction(async function (conn) {
+//     let result = await db.setQuery(conn, 'select * from config where configid = (select configid from account where accountid = (select accountid from teacher_principal where userid = ?))', [teacherid]);
+//     let session = JSON.parse(result[0].configdata).session.value;
+//     var results = await db.setQuery(conn, 'CALL SQSP_GetResults(?,?,?)', [teacherid, studentid, session]);
+//     return results[0];
+//     })
+// }
 //Assign subject to Teacher for student
-exports.getAssignSubjectForStudent = async function (classid) {
-    let result = await db.query('select * from subjects where class = ?', [classid]);
-    return result
-}
+// exports.getAssignSubjectForStudent = async function (classid) {
+//     let result = await db.query('select * from subjects where class = ?', [classid]);
+//     return result
+// }
 
 //Update student details
 exports.updateStudentImage = async (img, studentid) => {

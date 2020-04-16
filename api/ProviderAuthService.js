@@ -112,6 +112,98 @@ app.post("/login", function (req, res, next) {
         return res.json({ status: 0, statusDescription: "Something went wrong" })
     }
 });
+/**
+* @swagger
+* paths:
+*     /providerauthservice/login:
+*         post:
+*             description: Login
+*             tags: [Provider Auth Service]
+*             summary: "User Login"
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 username:
+*                                     type: string
+*                                 password:
+*                                     type: string
+*                                     format: password
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*     /admin/signout:
+*       get:
+*          description: sign out
+*          tags: [Provider Auth Service]
+*          summary: sign out
+*          responses:
+*                   '200':
+*                     description: Redirects to Login Page
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*     /admin/forgotPassword:
+*         post:
+*             description: Forgot password
+*             tags: [Provider Auth Service]
+*             summary: Forgot password
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 emailid:
+*                                     type: string
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*                                 example:
+*                                    status: ''
+*                                    statusDescription: ''
+*     /admin/resetpassword:
+*         post:
+*             description: Reset password
+*             tags: [Provider Auth Service]
+*             summary: Reset password
+*             requestBody:
+*                 required: true
+*                 content:
+*                     application/x-www-form-urlencoded:
+*                         schema:
+*                             type: object
+*                             properties:
+*                                 token:
+*                                     type: string
+*                                 password:
+*                                     type: string
+*                                 cnfpassword:
+*                                     type: string
+*             responses:
+*                 '200':
+*                     description: Login
+*                     content:
+*                         application/json:
+*                             schema:
+*                                 type: object
+*                                 example:
+*                                    status: ''
+*                                    statusDescription: ''
+*/
 
 app.post("/accessTokenByRefershToken", async function (req, res) {
     try{
