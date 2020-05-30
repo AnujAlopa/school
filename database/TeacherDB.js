@@ -460,3 +460,23 @@ exports.getDailyAttendance = async function (accountid, teacherid, session) {
         return getAttendance;
     })
 }
+
+//save the student results
+exports.saveStudentResult = async function(resultObject){
+    return db.transaction(async function (conn) {
+        let Result = await db.setQuery(conn, 'select studentid, teacherid, session from examresult where studentid = ? and teacherid=? and session = ? and examinationtype = ?', [resultObject.studentid, resultObject.teacherid, resultObject.session, resultObject.examinationtype]);
+        if (Result.length > 0) {
+            let result1 = await db.setQuery(conn, 'update examresult set ? where studentid = ? and teacherid=? and session = ? and examinationtype = ?', [resultObject, resultObject.studentid, resultObject.teacherid, resultObject.session, resultObject.examinationtype]);
+            return result1.affectedRows;
+        } else {
+            let result = await db.setQuery(conn, 'insert into examresult set ?', resultObject);
+            return result.affectedRows;
+        }
+    })
+}
+
+//get the student results
+exports.getStudentResult = async function(resultObject){
+    let Result = await db.query('select * from examresult where studentid = ? and teacherid=? and session = ? and examinationtype = ?', [resultObject.studentid, resultObject.teacherid, resultObject.session, resultObject.examinationtype]);
+    return Result;
+}

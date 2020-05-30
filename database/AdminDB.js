@@ -274,5 +274,42 @@ exports.updateYourPassword = async function(forgotObj) {
     let result = await db.query('update userdetails set password = ? where adharnumber = ? and cellnumber = ? and dob = ? and userrole = ?',[forgotObj.password, forgotObj.adharnumber, forgotObj.cellnumber, forgotObj.dob, forgotObj.userrole]);
     return result
 }
+exports.checkPassword = async (userid) => {
+    var result = await db.query('select password from userdetails where userid = ?', [userid])
+    return result[0]
+}
+exports.changePassword = async (password, userid) => {
+    var result = await db.query('update userdetails set password = ? where userid = ?', [password, userid])
+    return result
+}
+exports.getUserDetailsByEmailId = async function(emailid) {
+    let userDetails = await db.query("select userid, firstname, lastname, cellnumber, emailid, userrole, status from userdetails where username = ?",[emailid]);
+    return userDetails;
+};
+exports.createPasswordChangeRequest = async function(passwordchangeReqObj) {
+    let result = await db.query("insert into password_changerequest set ? ", [passwordchangeReqObj]);
+    return result;
+};
+
+exports.getPasswordChangeRequestByToken = async function(token, currentDatetime) {
+    let result = await db.query("select userid, initiatedby from password_changerequest where token = ? and expiredatetime >= ?",[token, currentDatetime]);
+    return result;
+};
+exports.checkfirsttimelogin = async userid => {
+    let result = await db.query("select * from userdetails where userid = ?", userid);
+    return result;
+};
+exports.setUserPasswordByUserId = async function(userid, newpassword) {
+    let result = await db.query("update userdetails set password = ?,passwordchangecount=passwordchangecount+1, status = 1,wrongpasswordcount=0 where userid = ? ",[newpassword, userid]);
+    return result;
+};
+exports.deletePasswordChangeRequest = async function(token, userid) {
+    let result = await db.query("delete from  password_changerequest  where token = ? and initiatedby = ?",[token, userid]);
+    return result;
+};
+exports.removeAccessTokenFromDB = async function(userid) {
+  let result =  await db.query("DELETE FROM refreshTokenPortal WHERE userid=?", [userid]);
+  return result;
+};
 exports.getAllProvidersByAccountId = getAllProvidersByAccountId;
 

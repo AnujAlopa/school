@@ -17,7 +17,8 @@ function configLocalAuth(passport) {
             lastname: user.lastname,
             issuerid: user.issuerid,
             accountid:user.accountid,
-            configdata: user.configdata
+            configdata: user.configdata,
+            accountname: user.accountname
         });
     });
 

@@ -1,9 +1,10 @@
 const router = require('express').Router();
 const principalDB = require("../database/PrincipalDB.js");
 const UserEnum = require('../lookup/UserEnum');
-const EmailService = require('../EmailService/EmailService');
 const joiSchema = require('../apiJoi/Principal.js');
 const middleWare = require('../apiJoi/middleWare.js');
+const publisher = require('../pubsub/publisher');
+const generator = require('generate-password');
 
 var isPrincipal = function (req, res, next) {
     if (req.user.role === UserEnum.UserRoles.Principal) {
@@ -38,6 +39,7 @@ const assignSubjectToClass = middleWare(joiSchema.assignSubjectToClass, "body", 
 
 //create or Update staff only accessed by principal
 router.post("/createstaff", isPrincipal, staffObject, async function (req, res) {
+    let password = generator.generate({ length: 10, numbers: true });
     let img = req.body.images;
     var image;
     if (img == null) {
@@ -82,9 +84,30 @@ router.post("/createstaff", isPrincipal, staffObject, async function (req, res) 
     }
     let result = '';
     if(req.body.teacherid){
+        var publishEvent = {
+            "emailId": req.body.emailid.toLowerCase(),
+            "staffName": req.body.firstname + " " + req.body.lastname,
+            "schoolName": req.user.accountname,
+            "principalName": req.user.firstname + " " + req.user.lastname,
+            "tempPassword": password,
+            "userRole": userRole
+        }
+        publisher.publishEmailEventForCreateStaff(publishEvent);
+
         result = await principalDB.updateTeacherDetails(req.body.teacherid, teacherObj);
     }else{
+        var publishEvent = {
+            "emailId": req.body.emailid.toLowerCase(),
+            "staffName": req.body.firstname + " " + req.body.lastname,
+            "schoolName": req.user.accountname,
+            "principalName": req.user.firstname + " " + req.user.lastname,
+            "tempPassword": password,
+            "userRole": userRole
+        }
         result = await principalDB.createTeacher(teacherObj, req.user.userid, req.user.accountid);
+        if(result == 1){
+            publisher.publishEmailEventForCreateStaff(publishEvent);
+        }
     }
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: `${userRole} has been created successfully.` });

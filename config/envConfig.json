@@ -2,12 +2,22 @@
     "local": {
         "port": 80,
         "domain": "localhost:3000",
-        "resetpasswordurl": "http://localhost:3000/guest/ResetPassword?reset_token=",
+        "redirectLink": "http://edusamadhan.com/public/teachers",
+        "resetpasswordurl": "http://localhost:3000/public/ResetPassword?reset_token=",
         "mysqlConnection": {
             "host": "anujrds.cswlmpegbvzy.ap-south-1.rds.amazonaws.com",
             "user": "adminanuj",
             "password": "mypassword",
             "database": "schooldb"
+        },
+        "rabbitmq":{
+            "host":"localhost",
+            "port":"15672 ",
+            "username":"guest",
+            "password":"guest",
+            "emailQueue":"emailQueue",
+            "smsQueue":"otpQueue",
+            "auditQueue" : "auditQueue"
         },
         "emailDetails" :{
             "USER": "anujvermaatc1994@gmail.com", 

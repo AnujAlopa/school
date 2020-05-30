@@ -62,6 +62,24 @@ const saveAttendanceObject = Joi.object({
     section: Joi.number().required().valid(1,2,3,4,5)
 })
 
+const resultObject = Joi.object({
+    subjectName: Joi.string().required(),
+    totalMarks: Joi.number().min(1),
+    obtainMarks: Joi.string().max(Joi.ref('totalMarks')).min(1),
+    grade: Joi.string().max(5)
+})
+const saveResultObject = Joi.object({
+    studentid: Joi.number().required(),
+    examinationType: Joi.number().valid(1,2,3,4).required(),
+    subjectResultArray: Joi.array().items(resultObject)
+
+})
+
+const getResultObject = Joi.object({
+    studentid: Joi.number().required(),
+    examinationType: Joi.number().valid(1,2,3,4).required()
+})
+
 exports.studentObject = studentObject;
 exports.studentIdParams = studentIdParams;
 exports.adharNumberParams = adharNumberParams;
@@ -70,3 +88,5 @@ exports.studentCreateResult = studentCreateResult;
 exports.studentCreateAttendance = studentCreateAttendance;
 exports.studentIdBody = studentIdBody;
 exports.saveAttendanceObject = saveAttendanceObject;
+exports.saveResultObject = saveResultObject;
+exports.getResultObject = getResultObject;

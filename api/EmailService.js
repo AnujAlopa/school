@@ -2,9 +2,6 @@ const EmailService = require('../EmailService/EmailService');
 const envVariable = require("../config/envValues.js");
 const router = require('express').Router();
 
-// const add = (a,b) =>{
-//   return a+b
-// }
 //delete Users
 router.post("/contactus", async function (req, res) {
     let mailOptions = {

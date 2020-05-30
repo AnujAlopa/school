@@ -3,7 +3,8 @@ const superAdminDB = require("../database/SuperAdminDB.js");
 const UserEnum = require('../lookup/UserEnum');
 const encrypt = require("../utils/encrypt.js");
 const uuid = require('uuid');
-const EmailService = require('../EmailService/EmailService');
+const publisher = require('../pubsub/publisher');
+const generator = require('generate-password');
 
 function getKeyByValue(object, value) {
     return Object.keys(object).find(key => object[key] === value);
@@ -130,32 +131,25 @@ router.post("/createschooladmin", isSuperAdminRole, async function (req, res) {
             accounttype: data.accounttype
         };    
     }
-    // let mailOptions = {
-    //     from: req.body.emailid,
-    //     to: req.body.emailid,
-    //     subject: "Welcome Message",
-    //     text: 
-    //     `
-    //     Name: ${req.body.firstname +" "+ req.body.lastname} 
-    //     Cell Number: ${req.body.cellnumber} 
-    //     Username: ${req.body.emailid}
-    //     Password: ${req.body.adharnumber}
-    //     You are registered as a Principal of ${req.body.schoolname}. Login with these credentials. If you have any issue to use the application then contact Super Admin.
-
-    //     Regard:
-    //     Edusamadhan`
-    //   };
+    const publishEvent = {
+        "emailId": "anujvermaatc1994@gmail.com",
+        "principalName": req.body.firstname + " " + req.body.lastname,
+        "schoolName": req.body.schoolname,
+        "tempPassword": password,
+        "userRole": "Principal"
+    }
     var configdata = { "configdata": JSON.stringify(configData) }
     let result = await superAdminDB.createSchoolAdmin(adminObj, accountObj, configdata );
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: 'School account has been created successfully.' });
-        // EmailService.transporter.sendMail(mailOptions, function(error, info){});
+        publisher.publishEmailEventForCreateSchool(publishEvent);
     } else {
         res.status(200).json({ status: 0, statusDescription: 'Not able to create school account details.' });
     }
 });
 //update school information
 router.put("/:accountid", isSuperAdminRole, async function (req, res) {
+    let password = generator.generate({ length: 10, numbers: true });
     let img = req.body.images;
     var image;
     if (img == null) {
@@ -197,8 +191,16 @@ router.put("/:accountid", isSuperAdminRole, async function (req, res) {
         accountaddress: req.body.schooladdress,
         accountype: req.body.accounttype
     }
+    const publishEvent = {
+        "emailId": "anujvermaatc1994@gmail.com",
+        "principalName": req.body.firstname + " " + req.body.lastname,
+        "schoolName": req.body.schoolname,
+        "tempPassword": password,
+        "userRole": "Principal"
+    }
     let result = await superAdminDB.updateSchoolAdmin(req.params.accountid, adminObj, accountObj, configdata);
     if (result == 1) {
+        publisher.publishEmailEventForCreateSchool(publishEvent);
         res.status(200).json({ status: 1, statusDescription: 'School information has been updated successfully.' });
     } else {
         res.status(200).json({ status: 0, statusDescription: 'Not able to update school details.' });

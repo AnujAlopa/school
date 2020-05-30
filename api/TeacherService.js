@@ -43,6 +43,8 @@ const studentCreateResult = middleWare(joiSchema.studentCreateResult, "body", tr
 const studentCreateAttendance = middleWare(joiSchema.studentCreateAttendance, "body", false);
 const studentIdBody =  middleWare(joiSchema.studentIdBody, "body", true);
 const saveAttendanceObject =  middleWare(joiSchema.saveAttendanceObject, "body", true);
+const saveResultObject =  middleWare(joiSchema.saveResultObject, "body", true);
+const getResultObject =  middleWare(joiSchema.getResultObject, "params", true);
 
 
 //Student Registration
@@ -191,7 +193,7 @@ router.get("/getmyinactivatedstudents", isTeacherOrExamHead, async function (req
 });
 
 //check adharnumber
-router.get("/getAdharnumber/:adharnumber", adharNumberParams, async function(req, res){
+router.get("/getAdharnumber/:adharnumber", async function(req, res){
 let result = await teacherDB.checkAddhar(req.params.adharnumber);
 if(result){
     res.status(200).json({ "isAdharNumberUsed": true });
@@ -201,7 +203,7 @@ if(result){
 })
 
 //check emailid 
-router.get("/getEmailId/:emailid", emailIdParams, async function(req, res){
+router.get("/getEmailId/:emailid", async function(req, res){
     let result = await teacherDB.checkEmailId(encrypt.encrypt(req.params.emailid));
     if(result){
         res.status(200).json({ "isEmailIdUsed": true });
@@ -606,6 +608,41 @@ router.get('/getdailyattendance', async function (req, res) {
         res.status(200).json({ status: 1, statusDescription: result });
     } else {
         res.status(200).json({ status: 0, statusDescription: "Student is not Reactivated." });
+    }
+});
+
+//save exam result of student
+router.post('/savestudentresult',isTeacherOrExamHead, saveResultObject, async function (req, res) {
+    let resultObject = {
+        studentid: req.body.studentid,
+        teacherid: req.user.userid,
+        examinationtype: req.body.examinationType,
+        session: JSON.parse(req.user.configdata).session,
+        subjectResultArray: JSON.stringify(req.body.subjectResultArray)
+    }
+
+    let result = await teacherDB.saveStudentResult(resultObject);
+    if (result == 1) {
+        res.status(200).json({ status: 1, statusDescription: "Result has been saved successfully." });
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Result is not saved." });
+    }
+});
+
+//get exam result of student
+router.get('/getstudentresult/:studentid/:examinationType',isTeacherOrExamHead, getResultObject,  async function (req, res) {
+    let resultObject = {
+        studentid: req.params.studentid,
+        teacherid: req.user.userid,
+        examinationtype: req.params.examinationType,
+        session: JSON.parse(req.user.configdata).session
+    }
+
+    let result = await teacherDB.getStudentResult(resultObject);
+    if (result.length>0) {
+        res.status(200).json({ status: 1, statusDescription: result });
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to get the result." });
     }
 });
 
