@@ -164,7 +164,8 @@ router.get("/feedetails/:adharnumber", isAccountant, adharNumberParams, isStuden
     let result = await studentFeeDB.getStudentFeeDetails(req.params.adharnumber, JSON.parse(req.user.configdata).session, req.user.accountid, UserEnum.UserRoles.Student);
     if (result.student.length > 0) {
         var s = result.student[0];
-        var f = result.feeDetails[0];
+        var studentMonthFee = result.feeDetails[0];
+        let transportFee = result.transportFee[0];
         var str = result.feeStructure[0];
 
         var studentfeeData = {
@@ -195,23 +196,41 @@ router.get("/feedetails/:adharnumber", isAccountant, adharNumberParams, isStuden
         }
         if (result.feeDetails.length > 0) {
             var studentFeeDetails = {
-                jan: f.january,
-                feb: f.february,
-                mar: f.march,
-                apr: f.april,
-                may: f.may,
-                jun: f.june,
-                jul: f.july,
-                aug: f.august,
-                sep: f.september,
-                oct: f.october,
-                nov: f.november,
-                dec: f.december
+                jan: studentMonthFee.january!= null && JSON.parse(studentMonthFee.january)[0].schoolFee,
+                feb: studentMonthFee.february!= null && JSON.parse(studentMonthFee.february)[0].schoolFee,
+                mar: studentMonthFee.march!= null && JSON.parse(studentMonthFee.march)[0].schoolFee,
+                apr: studentMonthFee.april!= null && JSON.parse(studentMonthFee.april)[0].schoolFee,
+                may: studentMonthFee.may!= null && JSON.parse(studentMonthFee.may)[0].schoolFee,
+                jun: studentMonthFee.june!= null && JSON.parse(studentMonthFee.june)[0].schoolFee,
+                jul: studentMonthFee.july!= null && JSON.parse(studentMonthFee.july)[0].schoolFee,
+                aug: studentMonthFee.august!= null && JSON.parse(studentMonthFee.august)[0].schoolFee,
+                sep: studentMonthFee.september!= null && JSON.parse(studentMonthFee.september)[0].schoolFee,
+                oct: studentMonthFee.october!= null && JSON.parse(studentMonthFee.october)[0].schoolFee,
+                nov: studentMonthFee.november!= null && JSON.parse(studentMonthFee.november)[0].schoolFee,
+                dec: studentMonthFee.december!= null && JSON.parse(studentMonthFee.december)[0].schoolFee
             }
         } else {
             studentFeeDetails = {}
         }
-        res.status(200).json({ status: 1, studentfeeData: studentfeeData, studentFeeDetails: studentFeeDetails, studentFeeStructure: studentFeeStructure });
+        if (result.transportFee.length > 0) {
+            var transportFeeDetails = {
+                jan: transportFee.january!= null && JSON.parse(transportFee.january)[0].transportFee,
+                feb: transportFee.february!= null && JSON.parse(transportFee.february)[0].transportFee,
+                mar: transportFee.march!= null && JSON.parse(transportFee.march)[0].transportFee,
+                apr: transportFee.april!= null && JSON.parse(transportFee.april)[0].transportFee,
+                may: transportFee.may!= null && JSON.parse(transportFee.may)[0].transportFee,
+                jun: transportFee.june!= null && JSON.parse(transportFee.june)[0].transportFee,
+                jul: transportFee.july!= null && JSON.parse(transportFee.july)[0].transportFee,
+                aug: transportFee.august!= null && JSON.parse(transportFee.august)[0].transportFee,
+                sep: transportFee.september!= null && JSON.parse(transportFee.september)[0].transportFee,
+                oct: transportFee.october!= null && JSON.parse(transportFee.october)[0].transportFee,
+                nov: transportFee.november!= null && JSON.parse(transportFee.november)[0].transportFee,
+                dec: transportFee.december!= null && JSON.parse(transportFee.december)[0].transportFee
+            }
+        } else {
+            transportFeeDetails = {}
+        }
+        res.status(200).json({ status: 1, studentfeeData: studentfeeData, studentFeeDetails: studentFeeDetails, studentFeeStructure: studentFeeStructure, transportFeeDetails: transportFeeDetails });
     } else {
         res.status(200).json({ status: 0, statusDescription: "Not able to get fee details." });
     }
@@ -225,12 +244,59 @@ router.get("/getmonthlyfee/:adharnumber/:selectedmonth", isAccountant, adharAndM
         res.status(200).json({ status: 0, statusDescription: "Not able to get month." });
     }
 })
-//pay student fee
-router.post("/paystudentfee", isAccountant, monthFeeObject, isStudentBelongsToSameSchool, async function (req, res) {
-    let studentFeeObj = {
-        monthName: req.body.monthName,
-        selectedmonthfee: req.body.selectedmonthfee
+//get fee structure
+router.get("/getfeestructure/:adharnumber", isAccountant, isStudentBelongsToSameSchool, async function (req, res) {
+    let result = await studentFeeDB.getFeeStructure(req.params.adharnumber, JSON.parse(req.user.configdata).session, req.user.accountid, req.params.selectedmonth);
+    if (result.length > 0) {
+        res.status(200).json({ status: 1, statusDescription: result });
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to get month." });
     }
+})
+//pay transport fee
+router.post("/paytransportfee", isAccountant, isStudentBelongsToSameSchool, async function (req, res) {
+    let transportFeeObj = {}
+    await req.body.selectedMonthName.forEach(async(item, index)=>{
+    let monthName= item.value;
+    if(monthName == 'january')transportFeeObj.january = JSON.stringify(item.transportFee)
+    else if(monthName == 'february')transportFeeObj.february = JSON.stringify(item.transportFee)
+    else if(monthName == 'march')transportFeeObj.march = JSON.stringify(item.transportFee)
+    else if(monthName == 'april')transportFeeObj.april = JSON.stringify(item.transportFee)
+    else if(monthName == 'may')transportFeeObj.may = JSON.stringify(item.transportFee)
+    else if(monthName == 'june')transportFeeObj.june = JSON.stringify(item.transportFee)
+    else if(monthName == 'july')transportFeeObj.july = JSON.stringify(item.transportFee)
+    else if(monthName == 'august')transportFeeObj.august = JSON.stringify(item.transportFee)
+    else if(monthName == 'september')transportFeeObj.september = JSON.stringify(item.transportFee)
+    else if(monthName == 'october')transportFeeObj.october = JSON.stringify(item.transportFee)
+    else if(monthName == 'november')transportFeeObj.november = JSON.stringify(item.transportFee)
+    else if(monthName == 'december')transportFeeObj.december = JSON.stringify(item.transportFee)
+    })
+    let result = await studentFeeDB.payTransportFee(req.body.adharnumber, JSON.parse(req.user.configdata).session, transportFeeObj);
+    if (result == 1) {
+        res.status(200).json({ status: 1, statusDescription: "Student fee has been submitted successfully." });
+    } else {
+        res.status(200).json({ status: 0, statusDescription: "Not able to submit the fee." });
+    }
+})
+
+//pay student fee
+router.post("/paystudentfee", isAccountant, isStudentBelongsToSameSchool, async function (req, res) {
+    let studentFeeObj = {}
+    await req.body.selectedMonthName.forEach(async(item, index)=>{
+    let monthName= item.value;
+    if(monthName == 'january')studentFeeObj.january = JSON.stringify(item.schoolFee)
+    else if(monthName == 'february')studentFeeObj.february = JSON.stringify(item.schoolFee)
+    else if(monthName == 'march')studentFeeObj.march = JSON.stringify(item.schoolFee)
+    else if(monthName == 'april')studentFeeObj.april = JSON.stringify(item.schoolFee)
+    else if(monthName == 'may')studentFeeObj.may = JSON.stringify(item.schoolFee)
+    else if(monthName == 'june')studentFeeObj.june = JSON.stringify(item.schoolFee)
+    else if(monthName == 'july')studentFeeObj.july = JSON.stringify(item.schoolFee)
+    else if(monthName == 'august')studentFeeObj.august = JSON.stringify(item.schoolFee)
+    else if(monthName == 'september')studentFeeObj.september = JSON.stringify(item.schoolFee)
+    else if(monthName == 'october')studentFeeObj.october = JSON.stringify(item.schoolFee)
+    else if(monthName == 'november')studentFeeObj.november = JSON.stringify(item.schoolFee)
+    else if(monthName == 'december')studentFeeObj.december = JSON.stringify(item.schoolFee)
+    })
     let result = await studentFeeDB.payStudentFee(req.body.adharnumber, JSON.parse(req.user.configdata).session, studentFeeObj);
     if (result == 1) {
         res.status(200).json({ status: 1, statusDescription: "Student fee has been submitted successfully." });

@@ -29,10 +29,15 @@ const adharAndMonthParams = Joi.object({
     selectedmonth: Joi.string().required().valid('january','february','march','april','may','june','july','august','september','october','november','december')
 })
 
+const feeObject = Joi.object({
+    value: Joi.string().required().valid('january','february','march','april','may','june','july','august','september','october','november','december'),
+    monthFee: Joi.number().required()
+})
+
 const monthFeeObject = Joi.object({
     adharnumber:Joi.string().max(12).min(12).required(),
-    selectedmonthfee: Joi.number().required(),
-    monthName: Joi.string().required().valid('january','february','march','april','may','june','july','august','september','october','november','december')
+    selectedMonthName: Joi.array().items(feeObject)
+    // monthName: Joi.string().required().valid('january','february','march','april','may','june','july','august','september','october','november','december')
 })
 
 const classIdAndSectionParams = Joi.object({
